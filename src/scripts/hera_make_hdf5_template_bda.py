@@ -166,7 +166,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         cminfo = get_cm_info()
         # add the enu co-ords
         lat = cminfo["cofa_lat"] * np.pi / 180.
-        lon = cminfo["cofa_lat"] * np.pi / 180.
+        lon = cminfo["cofa_lon"] * np.pi / 180.
         cminfo["antenna_positions_enu"] = get_antpos_enu(cminfo["antenna_positions"], lat, lon,
                                                          cminfo["cofa_alt"])
     else:
