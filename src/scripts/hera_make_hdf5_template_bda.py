@@ -224,8 +224,15 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         header.create_dataset("altitude",    dtype="<f8", data=cminfo['cofa_alt'])
         ant_pos = -1 * np.ones([NANTS_DATA,3], dtype=np.float64) * telescope_location_ecef
         ant_pos_enu = -1 * np.ones([NANTS_DATA,3], dtype=np.float64) * telescope_location_ecef
+        ant_pos_uvw = -1 * np.ones([NANTS,3], dtype=np.float64) * telescope_location_ecef
         ant_names = ["NONE"]*NANTS_DATA
         ant_nums = [-1]*NANTS_DATA
+        # make uvw array
+        for n, i in enumerate(cminfo["antenna_numbers"]):
+            ant_pos_uvw[i] = cminfo["antenna_positions_enu"][n]
+        for i,(a,b) in enumerate(baselines):
+            uvw[i] = ant_pos_uvw[a] - ant_pos_uvw[b]
+        # get antenna metadata only for connected antennas
         idx = 0
         for n, ant in enumerate(cminfo["antenna_numbers"]):
             if ant not in ant_1_array:
@@ -238,8 +245,6 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         # make sure we have the number we're expecting
         if idx != NANTS_DATA:
             logger.warning("Didn't get the right number of antenna positions. Expected {:d}, got {:d}".format(NANTS_DATA, idx))
-        for i,(a,b) in enumerate(baselines):
-            uvw[i] = ant_pos_enu[a] - ant_pos_enu[b]
         header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS_DATA,), data=ant_names)
         header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS_DATA,), data=ant_nums)
         header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos)
