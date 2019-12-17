@@ -2,7 +2,7 @@ import socket
 import numpy as np
 import struct
 import time
-import cPickle as pickle
+import pickle as pickle
 
 
 NANTS = 192
@@ -14,14 +14,14 @@ NWORDS_PER_XENG = NWORDS / NXENG
 PAYLOAD_LEN = 4096
 BYTES_PER_PACKET = PAYLOAD_LEN + 16
 max_offset = NWORDS*8 / NXENG - PAYLOAD_LEN
-print "Max offset:", max_offset
+print("Max offset:", max_offset)
 
 NPACKETS = NWORDS * 8 / PAYLOAD_LEN
-print "Expecting %d packets" % NPACKETS
+print("Expecting %d packets" % NPACKETS)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 800000000)
-print sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF)
+print(sock.getsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF))
 
 sock.bind(("10.80.40.251", 10000))
 
@@ -42,10 +42,10 @@ while True:
         this_window = timestamp
     if (not wait) or (offset == 0):
         if  (timestamp != this_window):
-            print timestamp, this_window
+            print(timestamp, this_window)
             stop = time.time()
-            print "%d packets received in %.2f seconds" % (n, stop - start)
-            print "Missing %d packets" % (NPACKETS - n)
+            print("%d packets received in %.2f seconds" % (n, stop - start))
+            print("Missing %d packets" % (NPACKETS - n))
             n = 0
             start = stop
             break
@@ -58,7 +58,7 @@ while True:
         dout[xeng_id, offset>>2:(offset+PAYLOAD_LEN)>>2] = np.fromstring(data[16:], dtype='>i')
 
 
-print "Dumping packet to disk"
+print("Dumping packet to disk")
 with open("/tmp/packet.bin", "w") as fh:
     fh.write(dout.flatten().tostring()) #This is native (probably little) endian!!
 

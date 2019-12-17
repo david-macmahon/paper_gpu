@@ -28,5 +28,5 @@ for t in range(NTIMES/NTIME_PER_PKT):
                 tvg[t, a, :, t_pkt, p] = (np.arange(384) + 2*(a%3) + p) % 256
 
 for a in range(NANT_TOTAL):
-    print "Antenna %d: OK?:" % a,
-    print np.all(tvg[:,a,:,:,:] == x[:,a,:,:,:])
+    print("Antenna %d: OK?:" % a, end=' ')
+    print(np.all(tvg[:,a,:,:,:] == x[:,a,:,:,:]))

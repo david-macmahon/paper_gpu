@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from __future__ import print_function, division, absolute_import
+
 import h5py
 import sys
 import json

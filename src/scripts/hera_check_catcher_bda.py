@@ -105,30 +105,30 @@ while True:
         packets += 1
         t,b,o,a0,a1,x,l,data = decode_packet(pkt)
         if args.verbose and args.snap:
-           print "{0:4d} {1:3d} {2:4d} {3:1d} {4:3d} {5:3d} {6:2d}".format(t, b//N_bl_per_block, b%N_bl_per_block, o, a0, a1, x), data[:8]//INTSPEC
+           print("{0:4d} {1:3d} {2:4d} {3:1d} {4:3d} {5:3d} {6:2d}".format(t, b//N_bl_per_block, b%N_bl_per_block, o, a0, a1, x), data[:8]//INTSPEC)
         elif args.verbose:
-           print "{0:4d} {1:3d} {2:4d} {3:1d} {4:3d} {5:3d} {6:2d}".format(t, b//N_bl_per_block, b%N_bl_per_block, o, a0, a1, x), data[:8]
+           print("{0:4d} {1:3d} {2:4d} {3:1d} {4:3d} {5:3d} {6:2d}".format(t, b//N_bl_per_block, b%N_bl_per_block, o, a0, a1, x), data[:8])
 
         if args.check:
            if (a0 > N_ANTS_DATA or a1 > N_ANTS_DATA): 
-              print "Error! Received wrong antenna!"
+              print("Error! Received wrong antenna!")
            if args.snap:
               # Test data from snap
               if (a0 == 0) and (a1 == 1):
                  tspec = gen_tvg_pol(a0*2)*np.conj(gen_tvg_pol(a1*2))
                  data = data.reshape(128,4,2)//INTSPEC
                  if (a0 == a1):
-                    print a0, a1, o, np.all(tspec.real[o*128:(o+1)*128] == data[:,0,0])
+                    print(a0, a1, o, np.all(tspec.real[o*128:(o+1)*128] == data[:,0,0]))
                  else:
-                    print a0, a1, o, np.all(tspec.real[o*128:(o+1)*128] == data[:,0,0]//4)
+                    print(a0, a1, o, np.all(tspec.real[o*128:(o+1)*128] == data[:,0,0]//4))
        
            else:
-              n = [y for y,v in int_bin['baselines'].items() if (a0,a1) in v][0]
+              n = [y for y,v in list(int_bin['baselines'].items()) if (a0,a1) in v][0]
               if not (np.all(data == int_bin['data'][n][o*1024:(o+1)*1024])):
-                 print "Error!", int_bin['data'][n][:32:8], o, n, data[:32:8]
+                 print("Error!", int_bin['data'][n][:32:8], o, n, data[:32:8])
                  errors += 1
     except(KeyboardInterrupt):
        print("")
-       print("Total number of packets captured: %d"%packets)
-       print("Total number of errors: %d"%errors)
+       print(("Total number of packets captured: %d"%packets))
+       print(("Total number of errors: %d"%errors))
        break

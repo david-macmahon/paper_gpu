@@ -39,7 +39,7 @@ parser.add_argument('-S', dest='slice_by_xbox', action="store_true",
 args = parser.parse_args()
 
 if args.action not in ['start', 'stop']:
-    print 'Available actions are "start" and "stop"'
+    print('Available actions are "start" and "stop"')
     exit
 
 # Make status keys for the various X-engine instances which identify their redis entries
@@ -66,16 +66,16 @@ if args.action == 'start':
     trig_time = trig_mcnt / mcnts_per_second() + mcnt_origin
 
     #print 'Current MCNTs are:', gpumcnts
-    print 'Sync time is %s' % time.ctime(mcnt_origin)
-    print 'MCNTs per second: %.1f' % mcnts_per_second()
-    print 'Requested start time: %s' % time.ctime(args.starttime)
-    print 'Trigger MCNT: %d' % trig_mcnt
-    print 'Trigger time is %.1f seconds in the future (%s)' % (trig_time - time.time(), time.ctime(trig_time))
+    print('Sync time is %s' % time.ctime(mcnt_origin))
+    print('MCNTs per second: %.1f' % mcnts_per_second())
+    print('Requested start time: %s' % time.ctime(args.starttime))
+    print('Trigger MCNT: %d' % trig_mcnt)
+    print('Trigger time is %.1f seconds in the future (%s)' % (trig_time - time.time(), time.ctime(trig_time)))
 
     # round acc_len
     acclen = int(args.acclen / MCNT_XGPU_BLOCK_SIZE) * MCNT_XGPU_BLOCK_SIZE
-    print 'Requested accumulation length: %d' % args.acclen
-    print 'Actual accumulation length: %d' % acclen
+    print('Requested accumulation length: %d' % args.acclen)
+    print('Actual accumulation length: %d' % acclen)
 
     # Use the hashpipe publish channel to update keys in all status buffers.
     # See the docstring at https://github.com/david-macmahon/rb-hashpipe/blob/master/bin/hashpipe_redis_gateway.rb
