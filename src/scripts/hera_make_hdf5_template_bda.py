@@ -222,9 +222,9 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         telescope_location_ecef = get_telescope_location_ecef(lat, lon, alt)
         antpos_ecef = get_antpos_ecef(cminfo["antenna_positions"], lon)
         header.create_dataset("altitude",    dtype="<f8", data=cminfo['cofa_alt'])
-        ant_pos = -1 * np.ones([NANTS_DATA,3], dtype=np.float64) * telescope_location_ecef
-        ant_pos_enu = -1 * np.ones([NANTS_DATA,3], dtype=np.float64) * telescope_location_ecef
-        ant_pos_uvw = -1 * np.ones([NANTS,3], dtype=np.float64) * telescope_location_ecef
+        ant_pos = np.zeros([NANTS_DATA,3], dtype=np.float64)
+        ant_pos_enu = np.zeros([NANTS_DATA,3], dtype=np.float64)
+        ant_pos_uvw = np.zeros([NANTS,3], dtype=np.float64)
         ant_names = ["NONE"]*NANTS_DATA
         ant_nums = [-1]*NANTS_DATA
         # make uvw array
