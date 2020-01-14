@@ -104,7 +104,7 @@ if not args.nobda:
     for hn,host in enumerate(hosts):
        for i in range(args.ninstances):
           key = 'hashpipe://%s/%d/set' % (host, i)
-          r.publish(key, 'BDACONF=/tmp/bdaconfig.txt')
+          r.publish(key, 'BDACONF=%s' % args.bdaconf)
 
 # Configure the X-engines as even/odd correlators
 if (len(hosts) == 1) and (args.timeslices != 1):
