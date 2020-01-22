@@ -17,7 +17,7 @@ def get_cm_info():
     h = cm_sysutils.Handling()
     return h.get_cminfo_correlator()
 
-def get_hera_to_corr_ants(r, ants):
+def get_hera_to_corr_ants(r, ants=None):
     """
     Given a list of antenna numbers, get the 
     corresponding correlator numbers from the 
@@ -25,6 +25,8 @@ def get_hera_to_corr_ants(r, ants):
     """
     ant_to_snap = json.loads(r.hgetall("corr:map")['ant_to_snap'])
     corr_nums = []
+    if ants is None:
+        ants = [int(a) for a in ant_to_snap.keys()]
     for a in ants:
         host = ant_to_snap['%d'%a]['n']['host']
         chan = ant_to_snap['%d'%a]['n']['channel'] # snap_input_number
@@ -33,7 +35,6 @@ def get_hera_to_corr_ants(r, ants):
             continue
         corr_ant_number = json.loads(snap_ant_chans)[chan//2] #Indexes from 0-3 (ignores pol)
         corr_nums.append(corr_ant_number)
-
     return corr_nums
 
 def create_bda_config(n_ants_data, use_cm=False, use_redis=False):
