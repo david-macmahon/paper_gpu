@@ -1,17 +1,19 @@
 #!/usr/bin/env python
 
+"""BDA correlator."""
+
 from __future__ import print_function, division, absolute_import
 import h5py
-import sys
 import json
 import logging
 import numpy as np
 import time
 import copy
 import redis
-from hera_corr_f import helpers
+from hera_corr_cm.handlers import add_default_log_handlers
 
-logger = helpers.add_default_log_handlers(logging.getLogger(__file__))
+logger = add_default_log_handlers(logging.getLogger(__file__))
+
 
 def get_corr_to_hera_map(r, nants_data=192, nants=352):
     """
@@ -20,16 +22,16 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
     of correlator index (0 - Nants_data -1) to
     hera antenna number (0 - Nants).
     """
-    out_map = np.arange(nants, nants + nants_data) # use default values outside the range of real antennas
+    out_map = np.arange(nants, nants + nants_data)  # use default values outside the range of real antennas
 
     # A dictionary with keys which are antenna numbers
     # of the for {<ant> :{<pol>: {'host':SNAPHOSTNAME, 'channel':INTEGER}}}
-    ant_to_snap = json.loads(r.hgetall("corr:map")['ant_to_snap'])
+    ant_to_snap = json.loads(r.hget("corr:map", "ant_to_snap")
     #host_to_index = r.hgetall("corr:snap_ants")
     for ant, pol in ant_to_snap.iteritems():
         hera_ant_number = int(ant)
         host = pol["n"]["host"]
-        chan = pol["n"]["channel"] # runs 0-5
+        chan = pol["n"]["channel"]  # runs 0-5
         snap_ant_chans = r.hget("corr:snap_ants", host)
         if snap_ant_chans is None:
             logger.warning("Couldn't find antenna indices for %s" % host)
@@ -45,7 +47,7 @@ def get_bl_order(n_ants):
     """
     Return the order of baseline data output by a CASPER correlator
     X engine.
-    
+
     Extracted from the corr package -- https://github.com/ska-sa/corr
     """
     order1, order2 = [], []
@@ -190,12 +192,12 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     header.create_dataset("Nants_data", dtype="<i8", data=NANTS_DATA)
     header.create_dataset("Nants_telescope", dtype="<i8", data=NANTS_DATA)
     header.create_dataset("Nbls",   dtype="<i8", data=n_bls)
-    header.create_dataset("Nblts",  dtype="<i8", data=n_bls) 
+    header.create_dataset("Nblts",  dtype="<i8", data=n_bls)
     header.create_dataset("Nfreqs", dtype="<i8", data=NCHANS)
     header.create_dataset("Npols",  dtype="<i8", data=4)
     header.create_dataset("Nspws",  dtype="<i8", data=1)
     # For BDA, Ntimes needs to be n_bls long
-    #header.create_dataset("Ntimes", dtype="<i8", data=n_bls) 
+    #header.create_dataset("Ntimes", dtype="<i8", data=n_bls)
     header.create_dataset("Ntimes", dtype="<i8", data=2)
     header.create_dataset("corr_bl_order", dtype="<i8", data=np.array(baselines))
     header.create_dataset("corr_to_hera_map", dtype="<i8", data=np.array(corr_to_hera_map))
@@ -298,7 +300,7 @@ def add_extra_keywords(obj, cminfo=None, fenginfo=None):
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Create a template HDF5 header file, optionally '\
                                      'using the correlator C+M system to get current meta-data',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -307,7 +309,7 @@ if __name__ == "__main__":
                         help ='Use this flag to get up-to-date (hopefully) array meta-data from the C+M system')
     parser.add_argument('-r', dest='use_redis', action='store_true', default=False,
                         help ='Use this flag to get up-to-date (hopefully) f-engine meta-data from a redis server at `redishost`')
-    parser.add_argument('--config', type=str, default='/tmp/bdaconfig.txt', 
+    parser.add_argument('--config', type=str, default='/tmp/bdaconfig.txt',
                         help = 'BDA Configuration file to create header (taken from redis by default)')
     args = parser.parse_args()
 
