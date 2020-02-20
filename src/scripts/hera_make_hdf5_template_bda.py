@@ -17,6 +17,8 @@ logger = add_default_log_handlers(logging.getLogger(__file__))
 
 def get_corr_to_hera_map(r, nants_data=192, nants=352):
     """
+    Return the correlator map.
+
     Given a redis.Redis instance, r, containing
     appropriate metadata - figure out the mapping
     of correlator index (0 - Nants_data -1) to
@@ -26,7 +28,7 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
 
     # A dictionary with keys which are antenna numbers
     # of the for {<ant> :{<pol>: {'host':SNAPHOSTNAME, 'channel':INTEGER}}}
-    ant_to_snap = json.loads(r.hget("corr:map", "ant_to_snap")
+    ant_to_snap = json.loads(r.hget("corr:map", "ant_to_snap"))
     #host_to_index = r.hgetall("corr:snap_ants")
     for ant, pol in ant_to_snap.iteritems():
         hera_ant_number = int(ant)
@@ -67,9 +69,9 @@ def get_ant_names():
     return ["foo"]*352
 
 def get_cm_info():
-    from hera_mc import cm_sysutils
-    h = cm_sysutils.Handling()
-    return h.get_cminfo_correlator()
+    """Return cm_info as if from hera_mc."""
+    from hera_corr_cm import redis_cm
+    return redis_cm.read_locations_from_redis()
 
 def get_antpos_enu(antpos, lat, lon, alt):
     """
@@ -167,10 +169,10 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     if use_cm:
         cminfo = get_cm_info()
         # add the enu co-ords
-        lat = cminfo["cofa_lat"] * np.pi / 180.
-        lon = cminfo["cofa_lon"] * np.pi / 180.
-        cminfo["antenna_positions_enu"] = get_antpos_enu(cminfo["antenna_positions"], lat, lon,
-                                                         cminfo["cofa_alt"])
+        lat = cminfo["cofa_lat"]
+        lon = cminfo["cofa_lon"]
+        alt = cminfo["cofa_alt"]
+        cminfo["antenna_positions_enu"] = get_antpos_enu(cminfo["antenna_positions"], lat, lon, alt)
     else:
         cminfo = None
 
@@ -218,8 +220,8 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     header.create_dataset("x_orientation", data=np.string_("NORTH"))
     if use_cm:
         # convert lat and lon from degrees -> radians
-        lat = cminfo['cofa_lat'] * np.pi / 180.
-        lon = cminfo['cofa_lon'] * np.pi / 180.
+        lat = cminfo['cofa_lat']
+        lon = cminfo['cofa_lon']
         alt = cminfo['cofa_alt']
         telescope_location_ecef = get_telescope_location_ecef(lat, lon, alt)
         antpos_ecef = get_antpos_ecef(cminfo["antenna_positions"], lon)
@@ -291,12 +293,12 @@ def add_extra_keywords(obj, cminfo=None, fenginfo=None):
     else:
         extras.create_dataset("finfo", data=np.string_("generated-without-redis"))
     #extras.create_dataset("st_type", data=np.string_("???"))
-    extras.create_dataset("duration", dtype="<f8", data=0.0) # filled in by receiver
-    extras.create_dataset("obs_id", dtype="<i8", data=0)     # filled in by receiver
-    extras.create_dataset("startt", dtype="<f8", data=0.0)   # filled in by receiver
-    extras.create_dataset("stopt",  dtype="<f8", data=0.0)   # filled in by receiver
-    extras.create_dataset("corr_ver",  dtype="|S32", data=np.string_("unknown"))# filled in by receiver
-    extras.create_dataset("tag",  dtype="|S128", data=np.string_("unknown"))# filled in by receiver
+    extras.create_dataset("duration", dtype="<f8", data=0.0)  # filled in by receiver
+    extras.create_dataset("obs_id", dtype="<i8", data=0)      # "
+    extras.create_dataset("startt", dtype="<f8", data=0.0)    # "
+    extras.create_dataset("stopt",  dtype="<f8", data=0.0)    # "
+    extras.create_dataset("corr_ver",  dtype="|S32", data=np.string_("unknown"))  # "
+    extras.create_dataset("tag",  dtype="|S128", data=np.string_("unknown"))  # "
 
 if __name__ == "__main__":
     import argparse
