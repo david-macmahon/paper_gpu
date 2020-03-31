@@ -71,7 +71,7 @@ def get_ant_names():
 def get_cm_info():
     """Return cm_info as if from hera_mc."""
     from hera_corr_cm import redis_cm
-    return redis_cm.read_locations_from_redis()
+    return redis_cm.read_cminfo_from_redis(return_as='dict')
 
 def get_antpos_enu(antpos, lat, lon, alt):
     """
