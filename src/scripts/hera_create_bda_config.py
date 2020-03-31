@@ -12,15 +12,17 @@ import redis
 
 NANTS = 352
 
+
 def get_cm_info():
-    from hera_mc import cm_sysutils
-    h = cm_sysutils.Handling()
-    return h.get_cminfo_correlator()
+    """Return cm_info as if from hera_mc."""
+    from hera_corr_cm import redis_cm
+    return redis_cm.read_cminfo_from_redis(return_as='dict')
+
 
 def get_hera_to_corr_ants(r, ants=None):
     """
-    Given a list of antenna numbers, get the 
-    corresponding correlator numbers from the 
+    Given a list of antenna numbers, get the
+    corresponding correlator numbers from the
     redis database, using a redis.Redis instance (r)
     """
     ant_to_snap = json.loads(r.hgetall("corr:map")['ant_to_snap'])
@@ -63,7 +65,7 @@ def create_bda_config(n_ants_data, use_cm=False, use_redis=False):
 
 if __name__ == "__main__":
     import argparse
-     
+
     parser = argparse.ArgumentParser(description='Create a configuration file for BDA '\
                                      'using the correlator C+M system to get current meta-data'\
                                      'NO BDA IS CURRENTLY PERFORMED!',
@@ -77,5 +79,5 @@ if __name__ == "__main__":
                         help ='Number of antennas that have data (used if cminfo is not set)')
     args = parser.parse_args()
 
-    baseline_pairs = create_bda_config(args.n_ants_data, use_cm = args.use_cminfo, use_redis=args.use_redis) 
+    baseline_pairs = create_bda_config(args.n_ants_data, use_cm = args.use_cminfo, use_redis=args.use_redis)
     np.savetxt(args.output, baseline_pairs, fmt='%d', delimiter=' ')

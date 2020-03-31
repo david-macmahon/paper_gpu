@@ -2,7 +2,6 @@
 
 from __future__ import print_function, division, absolute_import
 import h5py
-import sys
 import json
 import logging
 import numpy as np
@@ -45,7 +44,7 @@ def get_bl_order(n_ants):
     """
     Return the order of baseline data output by a CASPER correlator
     X engine.
-    
+
     Extracted from the corr package -- https://github.com/ska-sa/corr
     """
     order1, order2 = [], []
@@ -64,10 +63,12 @@ def get_ant_names():
     """
     return ["foo"]*352
 
+
 def get_cm_info():
-    from hera_mc import cm_sysutils
-    h = cm_sysutils.Handling()
-    return h.get_cminfo_correlator()
+    """Return cm_info as if from hera_mc."""
+    from hera_corr_cm import redis_cm
+    return redis_cm.read_cminfo_from_redis(return_as='dict')
+
 
 def get_antpos_enu(antpos, lat, lon, alt):
     """
@@ -263,7 +264,7 @@ def add_extra_keywords(obj, cminfo=None, fenginfo=None):
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description='Create a template HDF5 header file, optionally '\
                                      'using the correlator C+M system to get current meta-data',
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
