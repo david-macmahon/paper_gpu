@@ -1139,7 +1139,7 @@ static void *run(hashpipe_thread_args_t * args)
              file_start_t = gps_time;
              file_obs_id = (int64_t)gps_time;
 
-             sprintf(hdf5_fname, "zen.%7.5lf.uvh5", julian_time);
+             sprintf(hdf5_fname, "zen.%7.5lf.sum.uvh5", julian_time);
              fprintf(stdout, "Opening new file %s\n", hdf5_fname);
              start_file(&sum_file, template_fname, hdf5_fname, file_obs_id, file_start_t, tag);
              if (use_redis) {
