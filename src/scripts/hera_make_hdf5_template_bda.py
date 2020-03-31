@@ -169,8 +169,8 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     if use_cm:
         cminfo = get_cm_info()
         # add the enu co-ords
-        lat = cminfo["cofa_lat"]
-        lon = cminfo["cofa_lon"]
+        lat = cminfo["cofa_lat"] * np.pi / 180.0
+        lon = cminfo["cofa_lon"] * np.pi / 180.0
         alt = cminfo["cofa_alt"]
         cminfo["antenna_positions_enu"] = get_antpos_enu(cminfo["antenna_positions"], lat, lon, alt)
     else:
@@ -220,8 +220,8 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     header.create_dataset("x_orientation", data=np.string_("NORTH"))
     if use_cm:
         # convert lat and lon from degrees -> radians
-        lat = cminfo['cofa_lat']
-        lon = cminfo['cofa_lon']
+        lat = cminfo['cofa_lat'] * np.pi / 180.0
+        lon = cminfo['cofa_lon'] * np.pi / 180.0
         alt = cminfo['cofa_alt']
         telescope_location_ecef = get_telescope_location_ecef(lat, lon, alt)
         antpos_ecef = get_antpos_ecef(cminfo["antenna_positions"], lon)
