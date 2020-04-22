@@ -9,7 +9,6 @@ import numpy as np
 import time
 import copy
 import redis
-import warnings
 from hera_corr_cm.handlers import add_default_log_handlers
 
 logger = add_default_log_handlers(logging.getLogger(__file__))
@@ -36,7 +35,7 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
         chan = pol["n"]["channel"]  # runs 0-5
         snap_ant_chans = r.hget("corr:snap_ants", host)
         if snap_ant_chans is None:
-            warnings.warn("Couldn't find antenna indices for %s" % host)
+            logger.warning("Couldn't find antenna indices for %s" % host)
             continue
         corr_ant_number = json.loads(snap_ant_chans)[chan//2] #Indexes from 0-3 (ignores pol)
         print(corr_ant_number)
@@ -248,7 +247,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
             idx += 1
         # make sure we have the number we're expecting
         if idx != NANTS_DATA:
-            warnings.warn("Didn't get the right number of antenna positions. Expected {:d}, got {:d}".format(NANTS_DATA, idx))
+            logger.warning("Didn't get the right number of antenna positions. Expected {:d}, got {:d}".format(NANTS_DATA, idx))
         header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS_DATA,), data=ant_names)
         header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS_DATA,), data=ant_nums)
         header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos)

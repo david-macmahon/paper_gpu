@@ -8,7 +8,9 @@ import numpy as np
 import time
 import copy
 import redis
-import warnings
+from hera_corr_cm.handlers import add_default_log_handlers
+
+logger = add_default_log_handlers(logging.getLogger(__file__))
 
 def get_corr_to_hera_map(r, nants_data=192, nants=352):
     """
@@ -29,7 +31,7 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
         chan = pol["n"]["channel"] # runs 0-5
         snap_ant_chans = r.hget("corr:snap_ants", host)
         if snap_ant_chans is None:
-            warnings.warn("Couldn't find antenna indices for %s" % host)
+            logger.warning("Couldn't find antenna indices for %s" % host)
             continue
         corr_ant_number = json.loads(snap_ant_chans)[chan//2] #Indexes from 0-3 (ignores pol)
         print(corr_ant_number)
