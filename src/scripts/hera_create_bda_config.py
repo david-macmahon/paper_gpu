@@ -25,7 +25,8 @@ def get_hera_to_corr_ants(r, ants=None):
     corresponding correlator numbers from the
     redis database, using a redis.Redis instance (r)
     """
-    ant_to_snap = json.loads(r.hgetall("corr:map")['ant_to_snap'])
+    # dictionary keys are bytes, not strings
+    ant_to_snap = json.loads(r.hgetall("corr:map")[b'ant_to_snap'])
     corr_nums = []
     if ants is None:
         ants = [int(a) for a in ant_to_snap.keys()]
@@ -43,7 +44,8 @@ def create_bda_config(n_ants_data, use_cm=False, use_redis=False):
     # This does not account for BDA!!!
     if use_cm:
         cminfo = get_cm_info()
-        ants = cminfo['antenna_numbers']
+        # dictionary keys are bytes, not strings
+        ants = cminfo[b'antenna_numbers']
 
     if use_redis:
        r = redis.Redis('redishost')
