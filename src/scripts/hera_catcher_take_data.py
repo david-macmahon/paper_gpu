@@ -33,7 +33,7 @@ parser.add_argument('-t', dest='hdf5template', type=str, default='/tmp/template.
 
 args = parser.parse_args()
 
-r = redis.Redis(args.redishost)
+r = redis.Redis(args.redishost, decode_responses=True)
 
 if len(args.tag) > 127:
   raise ValueError("Tag argument must be <127 characters!")

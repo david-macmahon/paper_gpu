@@ -47,7 +47,7 @@ args = parser.parse_args()
 # Environment sourcing command required to run remote python jobs
 python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate"), ";"]
 
-r = redis.Redis(args.redishost)
+r = redis.Redis(args.redishost, decode_responses=True)
 
 # Run performance tweaking script
 if args.runtweak:
