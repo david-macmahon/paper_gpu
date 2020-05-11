@@ -170,13 +170,13 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         cminfo = get_cm_info()
         # add the enu co-ords
         # dict keys are bytes, not strings
-        lat = cminfo[b"cofa_lat"] * np.pi / 180.0
-        lon = cminfo[b"cofa_lon"] * np.pi / 180.0
-        alt = cminfo[b"cofa_alt"]
+        lat = cminfo["cofa_lat"] * np.pi / 180.0
+        lon = cminfo["cofa_lon"] * np.pi / 180.0
+        alt = cminfo["cofa_alt"]
         cofa_ecef = get_telescope_location_ecef(lat, lon, alt)
-        antenna_positions = np.asarray(cminfo[b"antenna_positions"])
+        antenna_positions = np.asarray(cminfo["antenna_positions"])
         antpos_ecef = antenna_positions + cofa_ecef
-        cminfo[b"antenna_positions_enu"] = get_antpos_enu(antpos_ecef, lat, lon, alt)
+        cminfo["antenna_positions_enu"] = get_antpos_enu(antpos_ecef, lat, lon, alt)
     else:
         cminfo = None
 
@@ -225,26 +225,26 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     if use_cm:
         # convert lat and lon from degrees -> radians
         # dict keys are bytes, not strings
-        header.create_dataset("altitude",    dtype="<f8", data=cminfo[b'cofa_alt'])
+        header.create_dataset("altitude",    dtype="<f8", data=cminfo['cofa_alt'])
         ant_pos = np.zeros([NANTS_DATA,3], dtype=np.float64)
         ant_pos_enu = np.zeros([NANTS_DATA,3], dtype=np.float64)
         ant_pos_uvw = np.zeros([NANTS,3], dtype=np.float64)
         ant_names = ["NONE"]*NANTS_DATA
         ant_nums = [-1]*NANTS_DATA
         # make uvw array
-        for n, i in enumerate(cminfo[b"antenna_numbers"]):
-            ant_pos_uvw[i] = cminfo[b"antenna_positions_enu"][n]
+        for n, i in enumerate(cminfo["antenna_numbers"]):
+            ant_pos_uvw[i] = cminfo["antenna_positions_enu"][n]
         for i,(a,b) in enumerate(baselines):
             uvw[i] = ant_pos_uvw[a] - ant_pos_uvw[b]
         # get antenna metadata only for connected antennas
         idx = 0
-        for n, ant in enumerate(cminfo[b"antenna_numbers"]):
+        for n, ant in enumerate(cminfo["antenna_numbers"]):
             if ant not in ant_1_array:
                 continue
             ant_pos[idx]     = antenna_positions[n]
-            ant_names[idx]   = np.string_(cminfo[b"antenna_names"][n])
-            ant_nums[idx]    = cminfo[b"antenna_numbers"][n]
-            ant_pos_enu[idx] = cminfo[b"antenna_positions_enu"][n]
+            ant_names[idx]   = np.string_(cminfo["antenna_names"][n])
+            ant_nums[idx]    = cminfo["antenna_numbers"][n]
+            ant_pos_enu[idx] = cminfo["antenna_positions_enu"][n]
             idx += 1
         # make sure we have the number we're expecting
         if idx != NANTS_DATA:
@@ -253,8 +253,8 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS_DATA,), data=ant_nums)
         header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos)
         header.create_dataset("antenna_positions_enu",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos_enu)
-        header.create_dataset("latitude",    dtype="<f8", data=cminfo[b"cofa_lat"])
-        header.create_dataset("longitude",   dtype="<f8", data=cminfo[b"cofa_lon"])
+        header.create_dataset("latitude",    dtype="<f8", data=cminfo["cofa_lat"])
+        header.create_dataset("longitude",   dtype="<f8", data=cminfo["cofa_lon"])
     else:
         header.create_dataset("altitude",    dtype="<f8", data=0.0)
         header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS,), data=["NONE"]*NANTS)
@@ -277,11 +277,14 @@ def create_header(h5, config, use_cm=False, use_redis=False):
 def add_extra_keywords(obj, cminfo=None, fenginfo=None):
     extras = obj.create_group("extra_keywords")
     if cminfo is not None:
-        extras.create_dataset("cmver", data=np.string_(cminfo[b"cm_version"]))
+        extras.create_dataset("cmver", data=np.string_(cminfo["cm_version"]))
         # Convert any numpy arrays to lists so they can be JSON encoded
         cminfo_copy = {}
         for key in list(cminfo.keys()):
-            str_key = key.decode("utf-8")
+            if isinstance(key, bytes):
+                str_key = key.decode("utf-8")
+            else:
+                str_key = key
             if isinstance(cminfo[key], np.ndarray):
                 cminfo_copy[str_key] = cminfo[key].tolist()
             else:
@@ -294,7 +297,10 @@ def add_extra_keywords(obj, cminfo=None, fenginfo=None):
     if fenginfo is not None:
         fenginfo_copy = {}
         for key in list(fenginfo.keys()):
-            str_key = key.decode("utf-8")
+            if isinstance(key, bytes):
+                str_key = key.decode("utf-8")
+            else:
+                str_key = key
             if isinstance(fenginfo[key], bytes):
                 fenginfo_copy[str_key] = fenginfo[key].decode("utf-8")
             else:
