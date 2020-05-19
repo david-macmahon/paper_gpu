@@ -500,7 +500,7 @@ static double compute_jd_from_mcnt(uint64_t mcnt, uint64_t sync_time_ms, double 
  * Write N_BL_PER_WRITE bcnts to the dataset, at the right offset
  */
 static void write_baseline_index(hdf5_id_t *id, hsize_t bcnt, hsize_t nblts, hid_t mem_space, 
-                                 uint64_t *visdata_buf, hbool_t *flags, uint32_t *nsamples)
+                                 uint64_t *visdata_buf, hbool_t *flags, float *nsamples)
 {
     hsize_t start[N_DATA_DIMS] = {bcnt, 0, 0, 0};
     hsize_t count[N_DATA_DIMS] = {nblts, 1, N_CHAN_PROCESSED, N_STOKES};
@@ -776,10 +776,10 @@ static void *run(hashpipe_thread_args_t * args)
 
     // Allocate an array of bools for flags and n_samples
     hbool_t *flags     = (hbool_t *) malloc(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(hbool_t));
-    uint32_t *nsamples = (uint32_t *)malloc(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(uint32_t));
+    float *nsamples = (float *)malloc(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(float));
 
     memset(flags,    0, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(hbool_t));
-    memset(nsamples, 1, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(uint32_t));
+    memset(nsamples, 1, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(float));
 
     // Define memory space of a block
     hsize_t dims[N_DATA_DIMS] = {N_BL_PER_WRITE, 1, N_CHAN_PROCESSED, N_STOKES};
