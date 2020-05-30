@@ -234,8 +234,8 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         # make uvw array
         for n, i in enumerate(cminfo["antenna_numbers"]):
             ant_pos_uvw[i] = cminfo["antenna_positions_enu"][n]
-        for i,(a,b) in enumerate(baselines):
-            uvw[i] = ant_pos_uvw[a] - ant_pos_uvw[b]
+        for i, (a, b) in enumerate(baselines):
+            uvw[i] = ant_pos_uvw[b] - ant_pos_uvw[a]
         # get antenna metadata only for connected antennas
         idx = 0
         for n, ant in enumerate(cminfo["antenna_numbers"]):
