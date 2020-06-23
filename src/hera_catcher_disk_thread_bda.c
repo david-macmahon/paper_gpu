@@ -626,7 +626,7 @@ static void add_mc_obs(char *fname)
   int err;
   fprintf(stdout, "Adding observation %s to M&C\n", fname);
   // Launch (hard-coded) python script in the background and pass in filename
-  sprintf(cmd, "/home/hera/hera-venv/bin/mc_add_observation.py %s", fname);
+  sprintf(cmd, "/home/hera/hera-venv/envs/hera/bin/mc_add_observation.py %s", fname);
   if (fork() == 0) {
     err = system(cmd);
     if (err != 0) {
