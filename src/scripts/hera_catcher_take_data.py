@@ -6,7 +6,8 @@ import argparse
 import subprocess
 
 python_source_cmd = ['source', '~/hera-venv/bin/activate']
-template_cmd = ['hera_make_hdf5_template_bda.py']
+template_cmd_bda = ['hera_make_hdf5_template_bda.py']
+template_cmd = ['hera_make_hdf5_template.py']
 
 def run_on_hosts(hosts, cmd, user=None, wait=True):
     if isinstance(cmd, str):
@@ -28,6 +29,8 @@ parser.add_argument('host', type=str, help='Host on which to capture data')
 parser.add_argument('-r', dest='redishost', type=str, default='redishost', help='Host serving redis database')
 parser.add_argument('-n', dest='nfiles', type=int, default=10, help='Number of files of data to capture')
 parser.add_argument('-m', dest='msperfile', type=int, default=60000, help='Number of ms of data per file')
+parser.add_argument('--nobda', dest='nobda', action='store_true', default=False,
+                    help='Use the baseline dependent averaging version')
 parser.add_argument('--tag', dest='tag', type=str, default='none', help='A descriptive tag to go into data files')
 parser.add_argument('-t', dest='hdf5template', type=str, default='/tmp/template.h5', help='Place to put HDF5 header template file')
 
@@ -39,7 +42,10 @@ if len(args.tag) > 127:
   raise ValueError("Tag argument must be <127 characters!")
 
 # Generate the meta-data template
-run_on_hosts([args.host], python_source_cmd + [';'] + template_cmd + ['-c', '-r', args.hdf5template], wait=True)
+if not args.nobda:
+    run_on_hosts([args.host], python_source_cmd + [';'] + template_cmd_bda + ['-c', '-r', args.hdf5template], wait=True)
+else:
+   run_on_hosts([args.host], python_source_cmd + [';'] + template_cmd + ['-c', '-r', args.hdf5template], wait=True)
 
 
 #Configure runtime parameters
