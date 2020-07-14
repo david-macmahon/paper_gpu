@@ -22,14 +22,11 @@ paper_databuf = paper_databuf.h \
 	            paper_databuf.c
 
 paper_threads = paper_fake_net_thread.c          \
-                paper_gpu_cpu_output_thread.c    \
-                paper_gpu_output_thread.c        \
                 paper_gpu_thread.c               \
                 paper_fluff_thread.c             \
                 hera_pktsock_thread.c            \
                 hera_ibv_thread.c                \
                 hera_fake_gpu_thread.c           \
-                paper_crc_thread.c               \
                 hera_gpu_output_thread.c         \
                 hera_gpu_bda_thread.c            \
                 hera_bda_output_thread.c         \
