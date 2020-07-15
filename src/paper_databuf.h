@@ -42,6 +42,7 @@
 #define N_PACKETS_PER_BLOCK_PER_F    (N_INPUTS_PER_PACKET * N_PACKETS_PER_BLOCK / N_FENGINES)
 // Number of X-engines per time slice. E.g. for HERA: 16.
 #define N_XENGINES_PER_TIME (N_CHAN_TOTAL / N_CHAN_PER_X)
+#define N_XENGINES          (N_XENGINES_PER_TIME*TIME_DEMUX)
 
 // Validate packet dimensions
 #if    N_BYTES_PER_PACKET != (N_TIME_PER_PACKET*N_CHAN_PER_PACKET*N_INPUTS_PER_PACKET)
@@ -309,6 +310,7 @@ typedef struct hera_bda_databuf{
 #define VIS_MATRIX_ENTRIES (N_CHAN_TOTAL/XENG_CHAN_SUM * (N_INPUTS * ((N_INPUTS>>1) + 1)))
 #define VIS_MATRIX_ENTRIES_PER_CHAN (N_INPUTS * ((N_INPUTS>>1) + 1))
 #define PACKETS_PER_VIS_MATRIX ((8L*TIME_DEMUX*VIS_MATRIX_ENTRIES) / OUTPUT_BYTES_PER_PACKET)
+#define PACKETS_PER_XENG_ID    (PACKETS_PER_VIS_MATRIX/N_XENGINES)
 #define N_STOKES                4
 
 typedef struct hera_catcher_input_header{
@@ -339,6 +341,9 @@ typedef struct hera_catcher_input_databuf {
   (2L*TIME_DEMUX*(VIS_MATRIX_ENTRIES_PER_CHAN * (N_CHAN_PER_X/XENG_CHAN_SUM)*(x)) + (TIME_DEMUX*((o)>>2)) + (2*N_STOKES*(t)))
 #define hera_catcher_input_databuf_by_bl_idx32(x, b) \
   (2L*TIME_DEMUX*(N_CHAN_PER_X/XENG_CHAN_SUM)*((VIS_MATRIX_ENTRIES_PER_CHAN * (x)) + (N_STOKES*(b))))
+
+// channels * vis_matrix * stokes * 4 bytes per re/imag
+#define MAX_HERA_CATCHER_IDX32 (((int64_t)N_XENGINES)*(N_CHAN_PER_X/XENG_CHAN_SUM)*VIS_MATRIX_ENTRIES_PER_CHAN*N_STOKES*4)
 
 
 /* 
