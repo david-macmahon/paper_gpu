@@ -65,7 +65,8 @@ typedef struct {
     int block_i;
     uint64_t bcnt_log_late;
     long out_of_seq_cnt;
-    long block_packet_counter[CATCHER_N_BLOCKS];
+    long block_packet_counter[CATCHER_N_BLOCKS]; 
+    long xeng_pkt_counter[CATCHER_N_BLOCKS][N_XENGINES];
     char flags[CATCHER_N_BLOCKS][PACKETS_PER_BLOCK];
     char baselines[CATCHER_N_BLOCKS][BASELINES_PER_BLOCK];
 } block_info_t;
@@ -137,8 +138,8 @@ static uint32_t set_block_filled(hera_catcher_bda_input_databuf_t *db, block_inf
   // Calculate missing packets.
   block_missed_pkt_cnt = PACKETS_PER_BLOCK - binfo->block_packet_counter[block_i];
   
-  block_missed_xengs = block_missed_pkt_cnt / (PACKETS_PER_BL_PER_X * BASELINES_PER_BLOCK);
-  block_missed_mod_cnt = block_missed_pkt_cnt % (PACKETS_PER_BL_PER_X * BASELINES_PER_BLOCK); 
+  block_missed_xengs = block_missed_pkt_cnt / PACKETS_PER_X ;
+  block_missed_mod_cnt = block_missed_pkt_cnt % PACKETS_PER_X ; 
 
   //fprintf(stdout,"Missed packets: %ld\tMissed Xengs:%ld\t", block_missed_pkt_cnt, block_missed_xengs);
 
@@ -147,7 +148,15 @@ static uint32_t set_block_filled(hera_catcher_bda_input_databuf_t *db, block_inf
   hputu4(st_p->buf, "NETBKOUT", block_i);
   hputu4(st_p->buf, "MISSXENG", block_missed_xengs);
   if(block_missed_mod_cnt){
-    fprintf(stderr, "Expected %lu packets, Got %lu\n", PACKETS_PER_BLOCK, binfo->block_packet_counter[block_i]);
+    fprintf(stderr, "Expected %lu packets, Got %lu\n", 
+            PACKETS_PER_BLOCK, 
+            binfo->block_packet_counter[block_i]);
+    // Print stats per-xeng
+    fprintf(stderr, "Fraction pkts received:\n");
+    for (i=0; i<N_XENGINES; i++){
+      fprintf(stderr, "XengID %2d: %.2f\n", i,
+              (float)binfo->xeng_pkt_counter[block_i][i]/PACKETS_PER_X);
+    }
     // Increment MISSEDPK by number of missed packets for this block
     hgetu8(st_p->buf, "MISSEDPK", &missed_pkt_cnt);
     missed_pkt_cnt += block_missed_pkt_cnt;
@@ -171,7 +180,8 @@ static inline void initialize_block_info(block_info_t * binfo){
 
     for(i = 0; i < CATCHER_N_BLOCKS; i++) {
       binfo->block_packet_counter[i] = 0;
-      memset(binfo->flags[i], 0, PACKETS_PER_BLOCK*sizeof(char));
+      memset(binfo->xeng_pkt_counter[i], 0, N_XENGINES*sizeof(long));
+      memset(binfo->flags[i], 1, PACKETS_PER_BLOCK*sizeof(char));
       memset(binfo->baselines[i], 0, BASELINES_PER_BLOCK*sizeof(char));
     }
 
@@ -279,10 +289,14 @@ static inline uint32_t process_packet(
              return -1; // We're exiting so return value is kind of moot
          }
        }
+       hashpipe_status_lock_safe(st_p);
+       hputs(st_p->buf, status_key, "running");
+       hashpipe_status_unlock_safe(st_p);
 
        // Initialize the newly acquired block
        initialize_block(db, cur_bcnt+BASELINES_PER_BLOCK); 
        binfo.block_packet_counter[pkt_block_i] = 0;
+       memset(binfo.xeng_pkt_counter[pkt_block_i], 0, N_XENGINES*sizeof(long));
        memset(binfo.flags[pkt_block_i],     1, PACKETS_PER_BLOCK*sizeof(char));
        memset(binfo.baselines[pkt_block_i], 0, BASELINES_PER_BLOCK*sizeof(char));
 
