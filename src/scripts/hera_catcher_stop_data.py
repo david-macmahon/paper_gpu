@@ -22,5 +22,5 @@ catcher_dict = {
 }
   
 pubchan = 'hashpipe://%s/%d/set' % (args.host, 0)
-for key, val in catcher_dict.iteritems():
+for key, val in catcher_dict.items():
    r.publish(pubchan, '%s=%s' % (key, val))

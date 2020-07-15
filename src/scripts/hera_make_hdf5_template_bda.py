@@ -2,7 +2,6 @@
 
 """BDA correlator."""
 
-from __future__ import print_function, division, absolute_import
 import h5py
 import json
 import logging
@@ -30,7 +29,7 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
     # of the for {<ant> :{<pol>: {'host':SNAPHOSTNAME, 'channel':INTEGER}}}
     ant_to_snap = json.loads(r.hget("corr:map", "ant_to_snap"))
     #host_to_index = r.hgetall("corr:snap_ants")
-    for ant, pol in ant_to_snap.iteritems():
+    for ant, pol in ant_to_snap.items():
         hera_ant_number = int(ant)
         host = pol["n"]["host"]
         chan = pol["n"]["channel"]  # runs 0-5
@@ -41,7 +40,7 @@ def get_corr_to_hera_map(r, nants_data=192, nants=352):
         corr_ant_number = json.loads(snap_ant_chans)[chan//2] #Indexes from 0-3 (ignores pol)
         print(corr_ant_number)
         out_map[corr_ant_number] = hera_ant_number
-        logger.info("HERA antenna %d maps to correlator input %d" % (hera_ant_number, corr_ant_number))
+        print("HERA antenna %d maps to correlator input %d" % (hera_ant_number, corr_ant_number))
 
     return out_map
 
@@ -75,7 +74,7 @@ def get_cm_info():
 
 def get_antpos_enu(antpos, lat, lon, alt):
     """
-    Compute the antenna positions in ENU coordinates from rotECEF.
+    Compute the antenna positions in ENU coordinates from ECEF.
 
     Args:
       antpos -- array of antenna positions. Should have shape (Nants, 3).
@@ -87,8 +86,8 @@ def get_antpos_enu(antpos, lat, lon, alt):
       enu -- array of antenna positions in ENU frame. Has shape (Nants, 3).
     """
     import pyuvdata.utils as uvutils
-    ecef = uvutils.ECEF_from_rotECEF(antpos, lon)
-    enu  = uvutils.ENU_from_ECEF(ecef, lat, lon, alt)
+    antpos = np.asarray(antpos)
+    enu  = uvutils.ENU_from_ECEF(antpos, lat, lon, alt)
     return enu
 
 def get_antpos_ecef(antpos, lon):
@@ -103,6 +102,7 @@ def get_antpos_ecef(antpos, lon):
       ecef -- array of antenna positions in ECEF frame. Has shape (Nants, 3)
     """
     import pyuvdata.utils as uvutils
+    antpos = np.asarray(antpos)
     ecef = uvutils.ECEF_from_rotECEF(antpos, lon)
     return ecef
 
@@ -169,10 +169,14 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     if use_cm:
         cminfo = get_cm_info()
         # add the enu co-ords
+        # dict keys are bytes, not strings
         lat = cminfo["cofa_lat"] * np.pi / 180.0
         lon = cminfo["cofa_lon"] * np.pi / 180.0
         alt = cminfo["cofa_alt"]
-        cminfo["antenna_positions_enu"] = get_antpos_enu(cminfo["antenna_positions"], lat, lon, alt)
+        cofa_ecef = get_telescope_location_ecef(lat, lon, alt)
+        antenna_positions = np.asarray(cminfo["antenna_positions"])
+        antpos_ecef = antenna_positions + cofa_ecef
+        cminfo["antenna_positions_enu"] = get_antpos_enu(antpos_ecef, lat, lon, alt)
     else:
         cminfo = None
 
@@ -220,11 +224,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     header.create_dataset("x_orientation", data=np.string_("NORTH"))
     if use_cm:
         # convert lat and lon from degrees -> radians
-        lat = cminfo['cofa_lat'] * np.pi / 180.0
-        lon = cminfo['cofa_lon'] * np.pi / 180.0
-        alt = cminfo['cofa_alt']
-        telescope_location_ecef = get_telescope_location_ecef(lat, lon, alt)
-        antpos_ecef = get_antpos_ecef(cminfo["antenna_positions"], lon)
+        # dict keys are bytes, not strings
         header.create_dataset("altitude",    dtype="<f8", data=cminfo['cofa_alt'])
         ant_pos = np.zeros([NANTS_DATA,3], dtype=np.float64)
         ant_pos_enu = np.zeros([NANTS_DATA,3], dtype=np.float64)
@@ -234,14 +234,14 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         # make uvw array
         for n, i in enumerate(cminfo["antenna_numbers"]):
             ant_pos_uvw[i] = cminfo["antenna_positions_enu"][n]
-        for i,(a,b) in enumerate(baselines):
-            uvw[i] = ant_pos_uvw[a] - ant_pos_uvw[b]
+        for i, (a, b) in enumerate(baselines):
+            uvw[i] = ant_pos_uvw[b] - ant_pos_uvw[a]
         # get antenna metadata only for connected antennas
         idx = 0
         for n, ant in enumerate(cminfo["antenna_numbers"]):
             if ant not in ant_1_array:
                 continue
-            ant_pos[idx]     = antpos_ecef[n] - telescope_location_ecef
+            ant_pos[idx]     = antenna_positions[n]
             ant_names[idx]   = np.string_(cminfo["antenna_names"][n])
             ant_nums[idx]    = cminfo["antenna_numbers"][n]
             ant_pos_enu[idx] = cminfo["antenna_positions_enu"][n]
@@ -258,7 +258,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     else:
         header.create_dataset("altitude",    dtype="<f8", data=0.0)
         header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS,), data=["NONE"]*NANTS)
-        header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS,), data=range(NANTS))
+        header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS,), data=list(range(NANTS)))
         header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS,3), data=np.zeros([NANTS,3]))
         header.create_dataset("antenna_positions_enu",   dtype="<f8", shape=(NANTS,3), data=np.zeros([NANTS,3]))
         header.create_dataset("latitude",    dtype="<f8", data=0.0)
@@ -279,17 +279,33 @@ def add_extra_keywords(obj, cminfo=None, fenginfo=None):
     if cminfo is not None:
         extras.create_dataset("cmver", data=np.string_(cminfo["cm_version"]))
         # Convert any numpy arrays to lists so they can be JSON encoded
-        cminfo_copy = copy.deepcopy(cminfo)
-        for key in cminfo_copy.keys():
-            if isinstance(cminfo_copy[key], np.ndarray):
-                cminfo_copy[key] = cminfo_copy[key].tolist()
+        cminfo_copy = {}
+        for key in list(cminfo.keys()):
+            if isinstance(key, bytes):
+                str_key = key.decode("utf-8")
+            else:
+                str_key = key
+            if isinstance(cminfo[key], np.ndarray):
+                cminfo_copy[str_key] = cminfo[key].tolist()
+            else:
+                cminfo_copy[str_key] = cminfo[key]
         extras.create_dataset("cminfo", data=np.string_(json.dumps(cminfo_copy)))
         del(cminfo_copy)
     else:
         extras.create_dataset("cmver", data=np.string_("generated-without-cminfo"))
         extras.create_dataset("cminfo", data=np.string_("generated-without-cminfo"))
     if fenginfo is not None:
-        extras.create_dataset("finfo", data=np.string_(json.dumps(fenginfo)))
+        fenginfo_copy = {}
+        for key in list(fenginfo.keys()):
+            if isinstance(key, bytes):
+                str_key = key.decode("utf-8")
+            else:
+                str_key = key
+            if isinstance(fenginfo[key], bytes):
+                fenginfo_copy[str_key] = fenginfo[key].decode("utf-8")
+            else:
+                fenginfo_copy[str_key] = fenginfo[key]
+        extras.create_dataset("finfo", data=np.string_(json.dumps(fenginfo_copy)))
     else:
         extras.create_dataset("finfo", data=np.string_("generated-without-redis"))
     #extras.create_dataset("st_type", data=np.string_("???"))

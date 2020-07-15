@@ -67,8 +67,8 @@ for i,t in enumerate(bdaconfig[:,2]):
     if (n==4): n = 3
     int_bin['baselines'][n].append((bdaconfig[i,0], bdaconfig[i,1]))
 
-for b in int_bin['baselines'].keys():
-    print b,len(int_bin['baselines'][b])
+for b in list(int_bin['baselines'].keys()):
+    print(b,len(int_bin['baselines'][b]))
 
 bcnt = 0; mcnt = 0; ctr = 0;
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -80,7 +80,7 @@ while True:
    for ns in np.logspace(1, Nbins, num=Nbins, base=2, dtype=np.int):
        if (ctr%ns == 0):
            nb = int(np.log2(ns)) - 1
-           print 'Sending: %d \tBaselines: %d \tBcnt: %d' % (ns, len(int_bin['baselines'][nb]), bcnt)
+           print('Sending: %d \tBaselines: %d \tBcnt: %d' % (ns, len(int_bin['baselines'][nb]), bcnt))
            for (a0,a1) in int_bin['baselines'][nb]:
                for xeng_id in range(Nx*Nt):
                    b = mcnt+((xeng_id//Nx)*2)

@@ -28,10 +28,10 @@ with open("/tmp/packet.bin", "r") as fh:
 bl_order = get_bl_order(NANTS)
 x = x.reshape(2, NCHANS, NBL, 4, 2)
 
-print np.all(x==0)
+print(np.all(x==0))
 
 for bn, bl in enumerate(bl_order):
     r = x[0,:,bn,0,0]
     i = x[0,:,bn,0,1]
     if not (np.all(r==0) and np.all(i==0)):
-        print bl[0], bl[1], r, i
+        print(bl[0], bl[1], r, i)

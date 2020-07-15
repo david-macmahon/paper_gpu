@@ -47,7 +47,7 @@ args = parser.parse_args()
 # Environment sourcing command required to run remote python jobs
 python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate"), ";"]
 
-r = redis.Redis(args.redishost)
+r = redis.Redis(args.redishost, decode_responses=True)
 
 # Run performance tweaking script
 if args.runtweak:
@@ -74,7 +74,7 @@ time.sleep(15)
 # NOTE: This has to come before template generation!
 # Generate the BDA config file and upload to redis
 if not args.nobda:
-    print 'Create configuration file'
+    print('Create configuration file')
     run_on_hosts([args.host], python_source_cmd + bda_config_cmd + ['-c','-r', '/tmp/bdaconfig.txt'], wait=True)
     os.system('scp "%s:%s" "%s" ' % ('hera-sn1', '/tmp/bdaconfig.txt','/tmp/bdaconfig.txt') )
     
@@ -98,7 +98,7 @@ catcher_dict = {
 # Reset various statistics counters
 
 pubchan = 'hashpipe://%s/%d/set' % (args.host, 0)
-for key, val in catcher_dict.iteritems():
+for key, val in catcher_dict.items():
    r.publish(pubchan, '%s=%s' % (key, val))
 for v in ['NETWAT', 'NETREC', 'NETPRC']:
     r.publish(pubchan, '%sMN=99999' % (v))
@@ -122,7 +122,7 @@ if not args.nobda:
          Nants += 1
    
    for i in range(4):
-       print (i, len(baselines[i]))
+       print((i, len(baselines[i])))
        r.publish(pubchan, 'NBL%dSEC=%d'  % (2**(i+1), len(baselines[i])))
    r.publish(pubchan, 'BDANANT=%d' % Nants)
    

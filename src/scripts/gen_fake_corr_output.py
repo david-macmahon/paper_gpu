@@ -20,9 +20,9 @@ n_bytes = TIME_DEMUX * NCHANS * n_bls * 2 * 4 # real/imag, bytes-per-word
 n_pkts = (n_bytes / BYTES_PER_PACKET)
 n_pkts_per_x = n_pkts / NX
 
-print "MBytes per dump: %.2f" % (n_bytes / 1e6)
-print "Packets per dump: %.4f" % (n_bytes / float(BYTES_PER_PACKET))
-print "Packets per Xeng: %.4f" % n_pkts_per_x
+print("MBytes per dump: %.2f" % (n_bytes / 1e6))
+print("Packets per dump: %.4f" % (n_bytes / float(BYTES_PER_PACKET)))
+print("Packets per Xeng: %.4f" % n_pkts_per_x)
 
 s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
@@ -48,5 +48,5 @@ while(True):
     if wait_time > 0:
         time.sleep(wait_time)
     total_time = time.time() - start
-    print "dump sent (MCNT: %d) in %.2fs at %.2f Gb/s" % (mcnt, total_time, n_bytes*8 / elapsed / 1e9)
+    print("dump sent (MCNT: %d) in %.2fs at %.2f Gb/s" % (mcnt, total_time, n_bytes*8 / elapsed / 1e9))
 

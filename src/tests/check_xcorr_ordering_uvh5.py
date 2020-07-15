@@ -62,7 +62,7 @@ for (a1,a2) in ant_pairs:
     except(KeyError):
         pass
 
-print 'Unique antennas', list(set([a[0] for a in ants]))
+print('Unique antennas', list(set([a[0] for a in ants])))
 
 if args.check_data:
     for a1,a2 in ants:
@@ -75,9 +75,9 @@ if args.check_data:
             tspec = gen_tvg_pol(snaploc_a1)*np.conj(gen_tvg_pol(snaploc_a2))
             tspec = np.sum(tspec.reshape(-1,4),axis=1)[:NCHANS]
 
-            print a1,a2, np.all(np.equal(tspec, uvd.get_data(a2,a1)[0,:,0]/INTSPEC))
+            print(a1,a2, np.all(np.equal(tspec, uvd.get_data(a2,a1)[0,:,0]/INTSPEC)))
 
             tspec = gen_tvg_pol(snaploc_a1+1)*np.conj(gen_tvg_pol(snaploc_a2+1))
             tspec = np.sum(tspec.reshape(-1,4),axis=1)[:NCHANS]
 
-            print a1,a2, np.all(np.equal(tspec, uvd.get_data(a2,a1)[0,:,1]/INTSPEC))
+            print(a1,a2, np.all(np.equal(tspec, uvd.get_data(a2,a1)[0,:,1]/INTSPEC)))

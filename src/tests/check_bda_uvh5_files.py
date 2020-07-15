@@ -26,7 +26,7 @@ def get_corr_to_hera_map(nants_data=192, nants=352):
 
     r = redis.Redis('redishost')
     ant_to_snap = json.loads(r.hgetall("corr:map")['ant_to_snap'])
-    for ant, pol in ant_to_snap.iteritems():
+    for ant, pol in ant_to_snap.items():
         hera_ant_number = int(ant)
         host = pol["n"]["host"]
         chan = pol["n"]["channel"] # runs 0-5
@@ -73,9 +73,9 @@ parser.add_argument('--ramp', action='store_true', default=False,
                     help='Frequency ramp in test vectors')
 args = parser.parse_args()
 
-snap_pol_map = {u'e2':0,  u'n0':1,
-                u'e6':2,  u'n4':3,
-                u'e1':4, u'n8':5}
+snap_pol_map = {'e2':0,  'n0':1,
+                'e6':2,  'n4':3,
+                'e1':4, 'n8':5}
 
 # Compute expected baseline pairs from
 # the configuration file
@@ -121,7 +121,7 @@ fakeimag = -2j
 int_bin = {}
 
 if (args.paper_gpu) and not (args.ramp):
-   print 'Checking Data for {0:s} mode with {1:s} test vectors'.format('Hashpipe','Constant')
+   print('Checking Data for {0:s} mode with {1:s} test vectors'.format('Hashpipe','Constant'))
 
    # Constant
    for n in range(N_BDABUF_BINS):
@@ -151,7 +151,7 @@ if (args.paper_gpu) and not (args.ramp):
       assert(np.all(np.equal(uv.data_array[0, 0, :96, :], int_bin[3][:96, :])))
 
 if args.paper_gpu and args.ramp:
-   print 'Checking Data for {0:s} mode with {1:s} test vectors'.format('Hashpipe','Ramp')
+   print('Checking Data for {0:s} mode with {1:s} test vectors'.format('Hashpipe','Ramp'))
 
    # Ramp
    for n in range(N_BDABUF_BINS):
@@ -159,7 +159,7 @@ if args.paper_gpu and args.ramp:
       int_bin[n] = np.asarray((2**n)*(fakereal + fakeimag)*x, dtype=np.complex64)
 
 if args.fengine:
-   print 'Checking data for SNAPS in test vec mode' 
+   print('Checking data for SNAPS in test vec mode')
 
    factor = 4
 
@@ -172,12 +172,12 @@ if args.fengine:
 
    for a0, a1 in zip(uv.ant_1_array, uv.ant_2_array):
 
-       print("({0:2d},{1:2d}) \t".format(a0,a1)),
+       print(("({0:2d},{1:2d}) \t".format(a0,a1)), end=' ')
 
        try:
            data = uv.get_data(a1, a0)
        except (ValueError):
-           print 'Antenna pair (%d,%d) has no data!!!'%(a0,a1)
+           print('Antenna pair (%d,%d) has no data!!!'%(a0,a1))
            continue
   
 
@@ -188,10 +188,10 @@ if args.fengine:
        #tspec = tspec[:N_CHAN_TOTAL]
        tspec = np.sum(tspec.reshape(-1,4),axis=1)[:NCHANS]
 
-       print np.all(np.equal(tspec, data[0,:,0]/(factor*INTSPEC))), '\t',
+       print(np.all(np.equal(tspec, data[0,:,0]/(factor*INTSPEC))), '\t', end=' ')
 
        tspec = gen_tvg_pol(loca0 +1)*np.conj(gen_tvg_pol(loca1 +1))
        #tspec = tspec[:N_CHAN_TOTAL]
        tspec = np.sum(tspec.reshape(-1,4),axis=1)[:NCHANS]
 
-       print np.all(np.equal(tspec, data[0,:,1]/(factor*INTSPEC)))
+       print(np.all(np.equal(tspec, data[0,:,1]/(factor*INTSPEC))))

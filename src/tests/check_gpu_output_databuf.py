@@ -16,6 +16,6 @@ with open(sys.argv[1], 'r') as fh:
 
 x = np.fromstring(raw, dtype=np.int32)
 
-print "All values equal to 0?:", np.all(x == 0)
-print "All values divisible by 2048?:", np.all((x % 2048) == 0)
-print "All values divisible by 262144?:", np.all((x % 262144) == 0)
+print("All values equal to 0?:", np.all(x == 0))
+print("All values divisible by 2048?:", np.all((x % 2048) == 0))
+print("All values divisible by 262144?:", np.all((x % 262144) == 0))

@@ -42,5 +42,5 @@ for a in range(12):
             for t_fast in range(NTIME_FAST):
                 for cplx in range(NCPLX):
                     ok = ok and np.all(tvg[a, p, :, cplx] == x[t, :, a, p, cplx, t_fast])
-    print "Antenna %d: OK?:" % a, ok
+    print("Antenna %d: OK?:" % a, ok)
     #print tvg[a,0,:,:], x[0,:,a,0,:,0]
