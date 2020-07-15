@@ -54,6 +54,7 @@ typedef struct {
     int initialized;
     int block_i;
     int block_packet_counter[CATCHER_N_BLOCKS];
+    int xeng_pkt_counter[CATCHER_N_BLOCKS][N_XENGINES];
 } block_info_t;
 
 
@@ -70,6 +71,7 @@ static uint64_t set_block_filled(hera_catcher_input_databuf_t *hera_catcher_inpu
     uint64_t block_missed_pkt_cnt;
     uint32_t missed_pkt_cnt;
     uint32_t block_i = binfo->block_i;
+    int i;
 
     // Validate that we're filling blocks in the proper sequence
     last_filled = (last_filled+1) % CATCHER_N_BLOCKS;
@@ -103,13 +105,19 @@ static uint64_t set_block_filled(hera_catcher_input_databuf_t *hera_catcher_inpu
     hashpipe_status_lock_busywait_safe(st_p);
     hputu4(st_p->buf, "NETBKOUT", block_i);
     if(block_missed_pkt_cnt) {
-        fprintf(stdout, "Expected %lu packets, Got %d\n", PACKETS_PER_VIS_MATRIX, binfo->block_packet_counter[block_i]);
+        fprintf(stdout, "Total expected %lu packets, Got %d\n", 
+                PACKETS_PER_VIS_MATRIX, 
+                binfo->block_packet_counter[block_i]);
+        fprintf(stdout, "Percentage pkts per xeng:\n");
+        // Dump per-xeng stats
+        for (i=0; i<N_XENGINES; i++){
+            fprintf(stdout, "Xeng_id %2d: %.2f\n", i, 
+                    (float)binfo->xeng_pkt_counter[block_i][i]/PACKETS_PER_XENG_ID);
+        }
 	// Increment MISSEDPK by number of missed packets for this block
 	hgetu4(st_p->buf, "MISSEDPK", &missed_pkt_cnt);
 	missed_pkt_cnt += block_missed_pkt_cnt;
 	hputu4(st_p->buf, "MISSEDPK", missed_pkt_cnt);
-    //  fprintf(stderr, "got %d packets instead of %d\n",
-    //	    binfo->block_packet_counter[block_i], N_PACKETS_PER_BLOCK);
     }
     hashpipe_status_unlock_safe(st_p);
 
@@ -129,7 +137,7 @@ static inline void initialize_block(hera_catcher_input_databuf_t * hera_catcher_
 // Subsequent calls are no-ops.
 static inline void initialize_block_info(block_info_t * binfo)
 {
-    int i;
+    int i,j;
 
     // If this block_info structure has already been initialized
     if(binfo->initialized) {
@@ -138,6 +146,9 @@ static inline void initialize_block_info(block_info_t * binfo)
 
     for(i = 0; i < CATCHER_N_BLOCKS; i++) {
 	binfo->block_packet_counter[i] = 0;
+        for(j = 0; j < N_XENGINES; j++){
+            binfo->xeng_pkt_counter[i][j] = 0;
+        }
     }
 
     // On startup mcnt_start will be zero and mcnt_log_late will be Nm.
@@ -210,6 +221,7 @@ static inline uint64_t process_packet(
         netmcnt = set_block_filled(hera_catcher_input_databuf_p, &binfo);
         // Reset binfo's packet counter for this packet's block
         binfo.block_packet_counter[binfo.block_i] = 0;
+        for(i=0; i<N_XENGINES; i++) binfo.xeng_pkt_counter[binfo.block_i][i] = 0;
         // Increment the current block number
         binfo.block_i = (binfo.block_i +1) % CATCHER_N_BLOCKS;
         // Wait (hopefully not long!) to acquire the block after next (i.e.
@@ -244,11 +256,13 @@ static inline uint64_t process_packet(
     
     // Increment packet count for block
     binfo.block_packet_counter[binfo.block_i]++;
+    // Increment packet count for xeng_id
+    binfo.xeng_pkt_counter[binfo.block_i][xeng_id]++;
 
     // Copy data into buffer
     dest_p = (uint32_t *)(hera_catcher_input_databuf_p->block[binfo.block_i].data) + (hera_catcher_input_databuf_idx32(time_demux_block, (xeng_id % N_XENGINES_PER_TIME), offset));
     payload_p = (uint32_t *)(PKT_UDP_DATA(p_frame) + sizeof(packet_header_t));
-    if (hera_catcher_input_databuf_idx32(time_demux_block, xeng_id / TIME_DEMUX, offset) >= 455344128L) {
+    if (hera_catcher_input_databuf_idx32(time_demux_block, xeng_id / TIME_DEMUX, offset) >= MAX_HERA_CATCHER_IDX32) {
         fprintf(stderr, "databuf offset outside allowed range!\n");
         fprintf(stderr, "offset is %lu\n", (hera_catcher_input_databuf_idx32(time_demux_block, xeng_id/TIME_DEMUX, offset)));
         fprintf(stderr, "mcnt: %lu, t-demux: %d, offset: %d, xeng: %d\n", mcnt, time_demux_block, offset, xeng_id/TIME_DEMUX);
@@ -294,6 +308,8 @@ static int init(hashpipe_thread_args_t *args)
     hputu4(st.buf, "MISSEDFE", 0);
     hputu4(st.buf, "MISSEDPK", 0);
     hashpipe_status_unlock_safe(&st);
+
+    fprintf(stdout, "Max offset allowed is set to: %ld\n", MAX_HERA_CATCHER_IDX32);
 
 #ifndef TIMING_TEST
     /* Set up pktsock */

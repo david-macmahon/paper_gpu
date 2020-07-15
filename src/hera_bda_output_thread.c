@@ -66,12 +66,17 @@ typedef struct struct_pkt {
 //  100 megabit per second =  10 nanosecond per bit
 //   10 megabit per second = 100 nanosecond per bit
 
+// Set to 200 Mbps -- OK for two instances per node.
+// With 16 nodes, amounts to 6.4 Gbps of data
+
 // 8 * OUTPUT_BYTES_PER_PACKET == 1 Gbps
 // 4 * 8 * OUTPUT_BYTES_PER_PACKET == 0.25 Gbps
 
-// Set to 200 Mbps -- OK for two instances per node.
-// With 16 nodes, amounts to 6.4 Gbps of data
-#define PACKET_DELAY_NS (4 * 8 * OUTPUT_BYTES_PER_PACKET)
+// For full BDA, 350 ants, 384 chan per pipeline
+//#define PACKET_DELAY_NS (2 * 8 * OUTPUT_BYTES_PER_PACKET)
+
+// For no-BDA, 192 ants, 384 chan per pipeline -- 125 usec
+#define PACKET_DELAY_NS (125 * 1000)
 
 // Open and connect a UDP socket to the given host and port.  Note that port is
 // a string and can be a stringified integer (e.g. "7148") or a service name
