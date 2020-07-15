@@ -497,9 +497,9 @@ static inline uint64_t process_packet(
     else if(pkt_mcnt_dist < 0 && pkt_mcnt_dist > -LATE_PKT_MCNT_THRESHOLD) {
 	// If not just after an mcnt reset, issue warning.
 	if(cur_mcnt >= binfo.mcnt_log_late) {
-	    hashpipe_warn("hera_pktsock_thread",
-		    "Ignoring late packet (%d mcnts late)",
-		    cur_mcnt - pkt_mcnt);
+	    hashpipe_warn("hera_pktsock_thread",  
+		    "Ignoring late packet (%d mcnts late, %d ant)",
+		    cur_mcnt - pkt_mcnt, pkt_header.ant);
 	}
 #ifdef LOG_MCNTS
 	late_packets_counted++;
@@ -512,8 +512,8 @@ static inline uint64_t process_packet(
 	// issue warning.
 	if(cur_mcnt != 0 && binfo.out_of_seq_cnt == 0) {
 	    hashpipe_warn("hera_pktsock_thread",
-		    "out of seq mcnt %012lx (expected: %012lx <= mcnt < %012x)",
-		    pkt_mcnt, cur_mcnt, cur_mcnt+3*N_TIME_PER_BLOCK*TIME_DEMUX);
+		    "out of seq mcnt %012lx from ant %d (expected mcnt: %012lx <= mcnt < %012x)",
+		    pkt_mcnt, pkt_header.ant, cur_mcnt, cur_mcnt+3*N_TIME_PER_BLOCK*TIME_DEMUX);
 	}
 
 	// Increment out-of-seq packet counter
@@ -539,8 +539,8 @@ static inline uint64_t process_packet(
 	    binfo.mcnt_log_late = binfo.mcnt_start + N_TIME_PER_BLOCK*TIME_DEMUX;
 	    binfo.block_i = block_for_mcnt(binfo.mcnt_start);
 	    hashpipe_warn("hera_pktsock_thread",
-		    "resetting to mcnt %012lx block %d based on packet mcnt %012lx",
-		    binfo.mcnt_start, block_for_mcnt(binfo.mcnt_start), pkt_mcnt);
+		    "resetting to mcnt %012lx block %d based on packet mcnt %012lx from ant %d",
+		    binfo.mcnt_start, block_for_mcnt(binfo.mcnt_start), pkt_mcnt, pkt_header.ant);
 	    // Reinitialize/recycle our two already acquired blocks with new
 	    // mcnt values.
 	    initialize_block(paper_input_databuf_p, binfo.mcnt_start);
