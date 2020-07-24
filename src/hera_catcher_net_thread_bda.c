@@ -110,6 +110,7 @@ static uint32_t set_block_filled(hera_catcher_bda_input_databuf_t *db, block_inf
   uint64_t block_missed_pkt_cnt;
   uint64_t block_missed_xengs, block_missed_mod_cnt, missed_pkt_cnt=0;
   uint32_t block_i = block_for_bcnt(binfo->bcnt_start);
+  int i;
 
   // Validate that we're filling blocks in the proper sequence
   last_filled = (last_filled+1) % CATCHER_N_BLOCKS;
