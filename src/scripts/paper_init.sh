@@ -121,6 +121,7 @@ case ${hostname} in
     # Save core  1 for eth2
     # Save core 8 for symmetry with core 0
     # Save core 9 for eth4 and eth5
+    # ARP: on recommendations from JXK, DMM, changed NET CPU to avoid 0,8
     #
     # Setup for two GPU devices (two TITANs).
     #
@@ -133,8 +134,8 @@ case ${hostname} in
     instances=( 
       #                               GPU       NET    FLF   GPU  OUT  BDA
       # mask  bind_host               DEV  XID  CPU    CPU   CPU  CPU  CPU
-      "0x00ff eth3                     0  $xid0  0   0x000e   4    5    6" # Instance 0, eth3
-      "0xff00 eth5                     1  $xid1  8   0x0e00  12   13   14" # Instance 1, eth5
+      "0x00ff eth3                     0  $xid0  7   0x000e   4    5    6" # Instance 0, eth3
+      "0xff00 eth5                     1  $xid1 15   0x0e00  12   13   14" # Instance 1, eth5
     );;
 
   *)
