@@ -14,6 +14,11 @@ ethtool -A eth5 rx on
 # Kernel buffer sizes
 sysctl net.core.rmem_max=8388608
 sysctl net.core.rmem_default=8388608
+#sysctl net.core.rmem_max=838860800
+#sysctl net.core.rmem_default=838860800
+#sysctl net.core.netdev_max_backlog=250000
+##sysctl net.core.netdev_max_backlog=1000
+#sysctl net.core.netdev_budget=300
 
 # Kill packets before the IP stack
 iptables -t raw -A PREROUTING -i eth3 -p udp -j DROP
