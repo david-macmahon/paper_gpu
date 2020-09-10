@@ -778,8 +778,12 @@ static void *run(hashpipe_thread_args_t * args)
     hbool_t *flags     = (hbool_t *) malloc(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(hbool_t));
     float *nsamples = (float *)malloc(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(float));
 
-    memset(flags,    0, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(hbool_t));
-    memset(nsamples, 1, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(float));
+    memset(flags, 0, N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES * sizeof(hbool_t));
+    // PLP: we want nsamples=1 for valid data, and memset Does The Wrong Thing for non-integer data.
+    // Someday we would like nsamples to also reflect the number of dropped packets.
+    for (i=0; i<(N_BL_PER_WRITE * N_CHAN_PROCESSED * N_STOKES); i++) {
+      nsamples[i] = 1.0;
+    }
 
     // Define memory space of a block
     hsize_t dims[N_DATA_DIMS] = {N_BL_PER_WRITE, 1, N_CHAN_PROCESSED, N_STOKES};
