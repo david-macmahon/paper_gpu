@@ -76,7 +76,10 @@ typedef struct struct_pkt {
 //#define PACKET_DELAY_NS (2 * 8 * OUTPUT_BYTES_PER_PACKET)
 
 // For no-BDA, 192 ants, 384 chan per pipeline -- 125 usec
-#define PACKET_DELAY_NS (125 * 1000)
+//#define PACKET_DELAY_NS (125 * 1000)
+
+// For BDA, 192 ants, 384 chan per pipeline -- 125 usec
+#define PACKET_DELAY_NS (4 * 125 * 1000)
 
 // Open and connect a UDP socket to the given host and port.  Note that port is
 // a string and can be a stringified integer (e.g. "7148") or a service name
