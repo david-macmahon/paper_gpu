@@ -10,8 +10,8 @@ ifconfig eth4 mtu 4500
 ethtool -A eth4 rx on
 
 # Kernel buffer sizes
-sysctl net.core.rmem_max=83886080
-sysctl net.core.rmem_default=83886080
+sysctl net.core.rmem_max=838860800
+sysctl net.core.rmem_default=838860800
 
 # Kill packets before the IP stack
 iptables -t raw -A PREROUTING -i eth4 -p udp -j DROP
