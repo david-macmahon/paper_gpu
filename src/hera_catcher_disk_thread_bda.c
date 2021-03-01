@@ -693,6 +693,7 @@ static void *run(hashpipe_thread_args_t * args)
     uint64_t sync_time_ms = 0;
     double gps_time;
     double julian_time;
+    int int_jd;
 
     // Variables for data collection parameters
     uint32_t acc_len;
@@ -1143,7 +1144,15 @@ static void *run(hashpipe_thread_args_t * args)
              file_start_t = gps_time;
              file_obs_id = (int64_t)gps_time;
 
-             sprintf(hdf5_fname, "zen.%7.5lf.sum.uvh5", julian_time);
+             // Make a new folder for output
+             if (file_cnt == 0) {
+               int_jd = (int)julian_time;
+               sprintf(hdf5_name, "%d", int_jd);
+               fprintf(stdout, "Making directory %s\n", hdf5_name);
+               mkdir(hdf5_name, 0755);
+             }
+
+             sprintf(hdf5_fname, "%d/zen.%7.5lf.sum.uvh5", int_jd, julian_time);
              fprintf(stdout, "Opening new file %s\n", hdf5_fname);
              start_file(&sum_file, template_fname, hdf5_fname, file_obs_id, file_start_t, tag);
              if (use_redis) {
@@ -1151,7 +1160,7 @@ static void *run(hashpipe_thread_args_t * args)
              }
 
              #ifndef SKIP_DIFF
-               sprintf(hdf5_fname, "zen.%7.5lf.diff.uvh5", julian_time);
+               sprintf(hdf5_fname, "%d/zen.%7.5lf.diff.uvh5", int_jd, julian_time);
                fprintf(stdout, "Opening new file %s\n", hdf5_fname);
                start_file(&diff_file, template_fname, hdf5_fname, file_obs_id, file_start_t, tag);
                if (use_redis) {
