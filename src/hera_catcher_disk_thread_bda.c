@@ -1147,9 +1147,9 @@ static void *run(hashpipe_thread_args_t * args)
              // Make a new folder for output
              if (file_cnt == 0) {
                int_jd = (int)julian_time;
-               sprintf(hdf5_name, "%d", int_jd);
-               fprintf(stdout, "Making directory %s\n", hdf5_name);
-               mkdir(hdf5_name, 0755);
+               sprintf(hdf5_fname, "%d", int_jd);
+               fprintf(stdout, "Making directory %s\n", hdf5_fname);
+               mkdir(hdf5_fname, 0755);
              }
 
              sprintf(hdf5_fname, "%d/zen.%7.5lf.sum.uvh5", int_jd, julian_time);
