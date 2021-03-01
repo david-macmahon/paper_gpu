@@ -72,6 +72,34 @@ def get_cm_info():
     from hera_corr_cm import redis_cm
     return redis_cm.read_cminfo_from_redis(return_as='dict')
 
+def get_antpos_info():
+    """Return positions for all antennas from hera_mc."""
+    import cartopy.crs as ccrs
+    import pyuvdata.utils as uvutils
+    from hera_mc import geo_sysdef
+    from hera_mc.geo_handling import Handling
+    ants = geo_sysdef.read_antennas()
+    # convert from eastings/northings into ENU
+    hand = Handling()
+    latlon_p = ccrs.Geodetic()
+    utm_p = ccrs.UTM(hand.hera_zone[0])
+    lat_corr = hand.lat_corr[hand.hera_zone[1]]
+    antpos_xyz = np.empty((350, 3), dtype=np.float64)
+    ant_names = np.empty((350,), dtype="S5")
+    for ant, pos in ants.items():
+        # unpack antenna information
+        antnum = int(ant[2:])
+        easting = pos["E"]
+        northing = pos["N"]
+        elevation = pos["elevation"]
+        # transfrom coordinates to ECEF
+        lon, lat = latlon_p.transform_point(easting, northing - lat_corr, utm_p)
+        xyz = uvutils.XYZ_from_LatLonAlt(np.radians(lat), np.radians(lon), elevation)
+        antpos_xyz[antnum, :] = xyz
+        # also save antenna name
+        ant_names[antnum] = ant
+    return antpos_xyz, ant_names
+
 def get_antpos_enu(antpos, lat, lon, alt):
     """
     Compute the antenna positions in ENU coordinates from ECEF.
@@ -153,7 +181,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     ant_2_array = np.array([y for (x,y) in baselines])
 
     NANTS_DATA = len(set(ant_1_array))
-    NANTS = 352
+    NANTS = 350
     NCHANS = int(2048 // 4 * 3)
     NCHANS_F = 8192
     NCHAN_SUM = 4
@@ -168,6 +196,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
 
     if use_cm:
         cminfo = get_cm_info()
+        extra_ants_xyz, extra_ants_names = get_antpos_info()
         # add the enu co-ords
         # dict keys are bytes, not strings
         lat = cminfo["cofa_lat"] * np.pi / 180.0
@@ -177,6 +206,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
         antenna_positions = np.asarray(cminfo["antenna_positions"])
         antpos_ecef = antenna_positions + cofa_ecef
         cminfo["antenna_positions_enu"] = get_antpos_enu(antpos_ecef, lat, lon, alt)
+        extra_ants_enu = get_antpos_enu(extra_ants_xyz, lat, lon, alt)
     else:
         cminfo = None
 
@@ -196,73 +226,107 @@ def create_header(h5, config, use_cm=False, use_redis=False):
 
     header = h5.create_group("Header")
     header.create_dataset("Nants_data", dtype="<i8", data=NANTS_DATA)
-    header.create_dataset("Nants_telescope", dtype="<i8", data=NANTS_DATA)
-    header.create_dataset("Nbls",   dtype="<i8", data=n_bls)
-    header.create_dataset("Nblts",  dtype="<i8", data=n_bls)
+    header.create_dataset("Nants_telescope", dtype="<i8", data=NANTS)
+    header.create_dataset("Nbls", dtype="<i8", data=n_bls)
+    header.create_dataset("Nblts", dtype="<i8", data=n_bls)
     header.create_dataset("Nfreqs", dtype="<i8", data=NCHANS)
-    header.create_dataset("Npols",  dtype="<i8", data=4)
-    header.create_dataset("Nspws",  dtype="<i8", data=1)
+    header.create_dataset("Npols", dtype="<i8", data=4)
+    header.create_dataset("Nspws", dtype="<i8", data=1)
     # For BDA, Ntimes needs to be n_bls long
     #header.create_dataset("Ntimes", dtype="<i8", data=n_bls)
     header.create_dataset("Ntimes", dtype="<i8", data=2)
     header.create_dataset("corr_bl_order", dtype="<i8", data=np.array(baselines))
-    header.create_dataset("corr_to_hera_map", dtype="<i8", data=np.array(corr_to_hera_map))
+    header.create_dataset(
+        "corr_to_hera_map", dtype="<i8", data=np.array(corr_to_hera_map)
+    )
     header.create_dataset("ant_1_array_conf", dtype="<i8", data=ant_1_array)
     header.create_dataset("ant_2_array_conf", dtype="<i8", data=ant_2_array)
-    header.create_dataset("antenna_diameters", dtype="<f8", data=[ANT_DIAMETER] * NANTS_DATA)
-    header.create_dataset("channel_width",     dtype="<f8", data=channel_width)
-    header.create_dataset("freq_array",        dtype="<f8", shape=(1, NCHANS), data=freqs) #TODO Get from config
-    header.create_dataset("history",   data=np.string_("%s: Template file created\n" % time.ctime()))
+    header.create_dataset(
+        "antenna_diameters", dtype="<f8", data=[ANT_DIAMETER] * NANTS_DATA
+    )
+    header.create_dataset("channel_width", dtype="<f8", data=channel_width)
+    header.create_dataset(
+        "freq_array", dtype="<f8", shape=(1, NCHANS), data=freqs
+    ) #TODO Get from config
+    header.create_dataset(
+        "history", data=np.string_("%s: Template file created\n" % time.ctime())
+    )
     header.create_dataset("instrument", data=np.string_(INSTRUMENT))
     header.create_dataset("integration_bin", dtype="<f8", data=integration_bin)
     header.create_dataset("object_name", data=np.string_("zenith"))
-    header.create_dataset("phase_type",  data=np.string_("drift"))
+    header.create_dataset("phase_type", data=np.string_("drift"))
     header.create_dataset("polarization_array", dtype="<i8", data=[-5, -6, -7, -8])
-    header.create_dataset("spw_array",      dtype="<i8", data=[0])
+    header.create_dataset("spw_array", dtype="<i8", data=[0])
     header.create_dataset("telescope_name", data=np.string_("HERA"))
-    header.create_dataset("vis_units",  data=np.string_("UNCALIB"))
+    header.create_dataset("vis_units", data=np.string_("UNCALIB"))
     header.create_dataset("x_orientation", data=np.string_("NORTH"))
     if use_cm:
         # convert lat and lon from degrees -> radians
         # dict keys are bytes, not strings
-        header.create_dataset("altitude",    dtype="<f8", data=cminfo['cofa_alt'])
-        ant_pos = np.zeros([NANTS_DATA,3], dtype=np.float64)
-        ant_pos_enu = np.zeros([NANTS_DATA,3], dtype=np.float64)
-        ant_pos_uvw = np.zeros([NANTS,3], dtype=np.float64)
-        ant_names = ["NONE"]*NANTS_DATA
-        ant_nums = [-1]*NANTS_DATA
+        header.create_dataset("altitude", dtype="<f8", data=cminfo['cofa_alt'])
+        ant_pos = np.zeros([NANTS, 3], dtype=np.float64)
+        ant_pos_enu = np.zeros([NANTS, 3], dtype=np.float64)
+        ant_pos_uvw = np.zeros([NANTS, 3], dtype=np.float64)
+        ant_names = ["NONE"] * NANTS
+        ant_nums = [-1]*NANTS
         # make uvw array
         for n, i in enumerate(cminfo["antenna_numbers"]):
             ant_pos_uvw[i] = cminfo["antenna_positions_enu"][n]
         for i, (a, b) in enumerate(baselines):
             uvw[i] = ant_pos_uvw[b] - ant_pos_uvw[a]
-        # get antenna metadata only for connected antennas
-        idx = 0
+        # default to "backup" data for all antennas
+        for i in range(NANTS):
+            ant_pos[i] = extra_ants_xyz[i] - cofa_ecef
+            ant_names[i] = extra_ants_names[i]
+            ant_nums[i] = i
+            ant_pos_enu[i] = extra_ants_enu[i]
+        # for hooked up antennas, overwrite with "correct" position info
         for n, ant in enumerate(cminfo["antenna_numbers"]):
             if ant not in ant_1_array:
                 continue
-            ant_pos[idx]     = antenna_positions[n]
-            ant_names[idx]   = np.string_(cminfo["antenna_names"][n])
-            ant_nums[idx]    = cminfo["antenna_numbers"][n]
-            ant_pos_enu[idx] = cminfo["antenna_positions_enu"][n]
-            idx += 1
-        # make sure we have the number we're expecting
-        if idx != NANTS_DATA:
-            logger.warning("Didn't get the right number of antenna positions. Expected {:d}, got {:d}".format(NANTS_DATA, idx))
-        header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS_DATA,), data=ant_names)
-        header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS_DATA,), data=ant_nums)
-        header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos)
-        header.create_dataset("antenna_positions_enu",   dtype="<f8", shape=(NANTS_DATA,3), data=ant_pos_enu)
-        header.create_dataset("latitude",    dtype="<f8", data=cminfo["cofa_lat"])
-        header.create_dataset("longitude",   dtype="<f8", data=cminfo["cofa_lon"])
+            # make sure we have the right index
+            assert ant_nums[ant] == cminfo["antenna_numbers"][n]
+            assert ant_nums[ant] == ant
+            # update positions and names
+            ant_pos[ant] = antenna_positions[n]
+            ant_names[ant] = np.bytes_(cminfo["antenna_names"][n])
+            ant_pos_enu[ant] = cminfo["antenna_positions_enu"][n]
+        header.create_dataset(
+            "antenna_names", dtype="|S5", shape=(NANTS,), data=ant_names
+        )
+        header.create_dataset(
+            "antenna_numbers", dtype="<i8", shape=(NANTS,), data=ant_nums
+        )
+        header.create_dataset(
+            "antenna_positions", dtype="<f8", shape=(NANTS, 3), data=ant_pos
+        )
+        header.create_dataset(
+            "antenna_positions_enu", dtype="<f8", shape=(NANTS, 3), data=ant_pos_enu
+        )
+        header.create_dataset("latitude", dtype="<f8", data=cminfo["cofa_lat"])
+        header.create_dataset("longitude", dtype="<f8", data=cminfo["cofa_lon"])
     else:
-        header.create_dataset("altitude",    dtype="<f8", data=0.0)
-        header.create_dataset("antenna_names",     dtype="|S5", shape=(NANTS,), data=["NONE"]*NANTS)
-        header.create_dataset("antenna_numbers",   dtype="<i8", shape=(NANTS,), data=list(range(NANTS)))
-        header.create_dataset("antenna_positions",   dtype="<f8", shape=(NANTS,3), data=np.zeros([NANTS,3]))
-        header.create_dataset("antenna_positions_enu",   dtype="<f8", shape=(NANTS,3), data=np.zeros([NANTS,3]))
-        header.create_dataset("latitude",    dtype="<f8", data=0.0)
-        header.create_dataset("longitude",   dtype="<f8", data=0.0)
+        header.create_dataset("altitude", dtype="<f8", data=0.0)
+        header.create_dataset(
+            "antenna_names", dtype="|S5", shape=(NANTS,), data=["NONE"] * NANTS
+        )
+        header.create_dataset(
+            "antenna_numbers", dtype="<i8", shape=(NANTS,), data=list(range(NANTS))
+        )
+        header.create_dataset(
+            "antenna_positions",
+            dtype="<f8",
+            shape=(NANTS, 3),
+            data=np.zeros((NANTS, 3), dtype=np.float64),
+        )
+        header.create_dataset(
+            "antenna_positions_enu",
+            dtype="<f8",
+            shape=(NANTS, 3),
+            data=np.zeros((NANTS, 3), dtype=np.float64),
+        )
+        header.create_dataset("latitude", dtype="<f8", data=0.0)
+        header.create_dataset("longitude", dtype="<f8", data=0.0)
 
     # lst_array needs populating by receiver. Should be center of integrations in radians
     #header.create_dataset("lst_array",   dtype="<f8", data=np.zeros(n_bls))
