@@ -9,7 +9,6 @@ import subprocess
 perf_tweaker = 'tweak-perf.sh'
 paper_init = 'paper_init.sh'
 paper_init_ibv = 'paper_init_ibv.sh'
-python_source_cmd = ['source', '~/hera-venv/bin/activate', 'hera']
 bda_config_cmd = ['hera_create_bda_config.py']
 
 def run_on_hosts(hosts, cmd, user=None, wait=True):
@@ -77,7 +76,7 @@ if args.test:
     init_args += ['-t']
 
 if args.redislog:
-    python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate")+";"]
+    python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate"), "hera", ";"]
     run_on_hosts(hosts, python_source_cmd + [paper_init] + init_args + ['0', '1'], wait=True) # two instances per host
 elif args.test:
     run_on_hosts(hosts, [paper_init] + init_args + ['0'], wait=True) # two instances per host
@@ -95,7 +94,7 @@ time.sleep(3)
 
 # Generate the BDA config file and upload to redis
 if not args.nobda:
-    python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate")+";"]
+    python_source_cmd = ["source", os.path.join(args.pypath, "bin/activate"), "hera", ";"]
     if args.nodatabase:
         run_on_hosts(hosts, python_source_cmd + bda_config_cmd + [args.bdaconf], wait=True)
     else:
