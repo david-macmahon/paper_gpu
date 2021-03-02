@@ -9,7 +9,7 @@ import subprocess
 perf_tweaker = 'tweak-perf.sh'
 paper_init = 'paper_init.sh'
 paper_init_ibv = 'paper_init_ibv.sh'
-python_source_cmd = ['source', '~/hera-venv/bin/activate']
+python_source_cmd = ['source', '~/hera-venv/bin/activate', 'hera']
 bda_config_cmd = ['hera_create_bda_config.py']
 
 def run_on_hosts(hosts, cmd, user=None, wait=True):
