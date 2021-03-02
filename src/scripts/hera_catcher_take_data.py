@@ -5,7 +5,7 @@ import time
 import argparse
 import subprocess
 
-python_source_cmd = ['source', '~/hera-venv/bin/activate']
+python_source_cmd = ['source', '~/hera-venv/bin/activate', 'hera']
 template_cmd_bda = ['hera_make_hdf5_template_bda.py']
 template_cmd = ['hera_make_hdf5_template.py']
 
