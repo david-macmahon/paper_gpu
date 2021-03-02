@@ -3,6 +3,9 @@
 # Add directory containing this script to PATH
 PATH="$(dirname $0):${PATH}"
 
+# Activate conda env
+source ~/hera-venv/bin/activate hera
+
 hostname=`hostname -s`
 
 function getip() {
