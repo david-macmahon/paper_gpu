@@ -242,7 +242,7 @@ def create_header(h5, config, use_cm=False, use_redis=False):
     header.create_dataset("ant_1_array_conf", dtype="<i8", data=ant_1_array)
     header.create_dataset("ant_2_array_conf", dtype="<i8", data=ant_2_array)
     header.create_dataset(
-        "antenna_diameters", dtype="<f8", data=[ANT_DIAMETER] * NANTS_DATA
+        "antenna_diameters", dtype="<f8", data=[ANT_DIAMETER] * NANTS
     )
     header.create_dataset("channel_width", dtype="<f8", data=channel_width)
     header.create_dataset(
