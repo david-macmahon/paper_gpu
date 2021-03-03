@@ -1149,7 +1149,7 @@ static void *run(hashpipe_thread_args_t * args)
                int_jd = (int)julian_time;
                sprintf(hdf5_fname, "%d", int_jd);
                fprintf(stdout, "Making directory %s\n", hdf5_fname);
-               mkdir(hdf5_fname, 0755);
+               mkdir(hdf5_fname, 0777);
              }
 
              sprintf(hdf5_fname, "%d/zen.%7.5lf.sum.uvh5", int_jd, julian_time);
