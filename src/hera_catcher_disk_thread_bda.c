@@ -631,6 +631,13 @@ static void add_mc_obs(char *fname)
     err = system(cmd);
     if (err != 0) {
       fprintf(stderr, "Error adding observation %s to M&C\n", fname);
+    } else {
+      // Add to rtp_launch_record table
+      sprintf(cmd, "/home/hera/hera-venv/envs/hera/bin/mc_rtp_launch_record.py %s", fname);
+      err = system(cmd);
+      if (err != 0) {
+	fprintf(stderr, "Error adding observation %s to RTP\n", fname);
+      }
     }
     exit(0);
   }
