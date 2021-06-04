@@ -73,6 +73,12 @@ static hashpipe_status_t *st_p;
 // order 2^<integer> split
 static int time_index;
 
+// Variables used to throttle bursty messages
+static int burst_message_counter = 0;
+static int burst_message_threshold = 5000;
+static int burst_max_duration_secs = 3600;
+static time_t burst_start = 0;
+
 #if 0
 static void print_pkt_header(packet_header_t * pkt_header) {
 
@@ -497,9 +503,29 @@ static inline uint64_t process_packet(
     else if(pkt_mcnt_dist < 0 && pkt_mcnt_dist > -LATE_PKT_MCNT_THRESHOLD) {
 	// If not just after an mcnt reset, issue warning.
 	if(cur_mcnt >= binfo.mcnt_log_late) {
-	    hashpipe_warn("hera_pktsock_thread",  
-		    "Ignoring late packet (%d mcnts late, %d ant)",
-		    cur_mcnt - pkt_mcnt, pkt_header.ant);
+	    // We throttle these potentially very bursty messages, which
+	    // involves two steps:
+	    //
+	    // Start a new burst if the previous one has ended
+	    if(time(NULL) - burst_start > burst_max_duration_secs) {
+		// Start a new burst
+		burst_start = time(NULL);
+		burst_message_counter = 0;
+	    }
+	    // If we have not yet logged the max number of messages for the
+	    // current burst, log this one and increment counter (and print
+	    // notification if threshold was reached).
+	    if(burst_message_counter < burst_message_threshold ) {
+		hashpipe_warn("hera_pktsock_thread",
+			"Ignoring late packet (%d mcnts late, %d ant)",
+			cur_mcnt - pkt_mcnt, pkt_header.ant);
+		burst_message_counter++;
+		if(burst_message_counter == burst_message_threshold) {
+		    hashpipe_warn("hera_pktsock_thread",
+			    "suppressing further occurrences for %d seconds",
+			    burst_start+burst_max_duration_secs-time(NULL));
+		}
+	    }
 	}
 #ifdef LOG_MCNTS
 	late_packets_counted++;
