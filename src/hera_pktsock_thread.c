@@ -537,9 +537,29 @@ static inline uint64_t process_packet(
 	// If not at start-up and this is the first out of order packet,
 	// issue warning.
 	if(cur_mcnt != 0 && binfo.out_of_seq_cnt == 0) {
-	    hashpipe_warn("hera_pktsock_thread",
-		    "out of seq mcnt %012lx from ant %d (expected mcnt: %012lx <= mcnt < %012x)",
-		    pkt_mcnt, pkt_header.ant, cur_mcnt, cur_mcnt+3*N_TIME_PER_BLOCK*TIME_DEMUX);
+	    // We throttle these potentially very bursty messages, which
+	    // involves two steps:
+	    //
+	    // Start a new burst if the previous one has ended
+	    if(time(NULL) - burst_start > burst_max_duration_secs) {
+		// Start a new burst
+		burst_start = time(NULL);
+		burst_message_counter = 0;
+	    }
+	    // If we have not yet logged the max number of messages for the
+	    // current burst, log this one and increment counter (and print
+	    // notification if threshold was reached).
+	    if(burst_message_counter < burst_message_threshold ) {
+		hashpipe_warn("hera_pktsock_thread",
+			"out of seq mcnt %012lx from ant %d (expected mcnt: %012lx <= mcnt < %012x)",
+			pkt_mcnt, pkt_header.ant, cur_mcnt, cur_mcnt+3*N_TIME_PER_BLOCK*TIME_DEMUX);
+		burst_message_counter++;
+		if(burst_message_counter == burst_message_threshold) {
+		    hashpipe_warn("hera_pktsock_thread",
+			    "suppressing further occurrences for %d seconds",
+			    burst_start+burst_max_duration_secs-time(NULL));
+		}
+	    }
 	}
 
 	// Increment out-of-seq packet counter
