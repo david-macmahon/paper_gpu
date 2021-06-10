@@ -75,7 +75,7 @@ static int time_index;
 
 // Variables used to throttle bursty messages
 static int burst_message_counter = 0;
-static int burst_message_threshold = 5000;
+static int burst_message_threshold =  120;
 static int burst_max_duration_secs = 3600;
 static time_t burst_start = 0;
 
