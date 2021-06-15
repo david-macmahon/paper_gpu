@@ -97,6 +97,7 @@ static void *run(hashpipe_thread_args_t * args)
         memcpy(&db_out->block[curblock_out].header, &db_in->block[curblock_in].header, sizeof(paper_input_header_t));
 
         paper_fluff(db_in->block[curblock_in].data, db_out->block[curblock_out].data);
+        //paper_fluff_lut(db_in->block[curblock_in].data, db_out->block[curblock_out].data);
 
         clock_gettime(CLOCK_MONOTONIC, &finish);
 
@@ -104,7 +105,7 @@ static void *run(hashpipe_thread_args_t * args)
         hashpipe_status_lock_safe(&st);
         // Bits per fluff / ns per fluff = Gbps
         hgetr4(st.buf, "FLUFMING", &min_gbps);
-        gbps = (float)(8*N_BYTES_PER_BLOCK)/ELAPSED_NS(start,finish);
+        gbps = (float)(8L*N_BYTES_PER_BLOCK)/ELAPSED_NS(start,finish); //Gigabits / s
         hputr4(st.buf, "FLUFGBPS", gbps);
         if(min_gbps == 0 || gbps < min_gbps) {
           hputr4(st.buf, "FLUFMING", gbps);

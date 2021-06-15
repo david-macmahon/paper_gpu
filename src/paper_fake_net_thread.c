@@ -27,12 +27,13 @@ static void *run(hashpipe_thread_args_t * args)
     const char * status_key = args->thread_desc->skey;
 
     /* Main loop */
-    int i, rv;
+    //int i, rv;
+    int rv;
     uint64_t mcnt = 0;
-    uint64_t *data;
-    int m,f,t,c;
+    //uint64_t *data;
+    //int m,a,t,c;
 #ifdef FAKE_TEST_INPUT1
-    int f1;
+    int a1;
 #endif
     int block_idx = 0;
     while (run_threads()) {
@@ -70,14 +71,15 @@ static void *run(hashpipe_thread_args_t * args)
         hashpipe_status_lock_safe(&st);
         hputs(st.buf, status_key, "receiving");
         hputi4(st.buf, "NETBKOUT", block_idx);
+        hputu8(st.buf, "NETMCNT", mcnt);
         hashpipe_status_unlock_safe(&st);
  
         // Fill in sub-block headers
-        for(i=0; i<N_SUB_BLOCKS_PER_INPUT_BLOCK; i++) {
-          db->block[block_idx].header.good_data = 1;
-          db->block[block_idx].header.mcnt = mcnt;
-          mcnt+=Nm;
-        }
+        //for(i=0; i<N_PACKETS_PER_BLOCK; i++) {
+        db->block[block_idx].header.good_data = 1;
+        db->block[block_idx].header.mcnt = mcnt;
+        mcnt+=Nm;
+        //}
 
 #ifndef FAKE_TEST_INPUT
 #define FAKE_TEST_INPUT 0
@@ -91,25 +93,25 @@ static void *run(hashpipe_thread_args_t * args)
 
         // For testing, zero out block and set input FAKE_TEST_INPUT, FAKE_TEST_CHAN to
         // all -16 (-1 * 16)
-        data = db->block[block_idx].data;
-        memset(data, 0, N_BYTES_PER_BLOCK);
+        //data = db->block[block_idx].data;
+        //memset(data, 0, N_BYTES_PER_BLOCK);
 
-        c = FAKE_TEST_CHAN;
-        f = FAKE_TEST_FID;
+        //c = FAKE_TEST_CHAN;
+        //a = FAKE_TEST_FID;
 #ifdef FAKE_TEST_INPUT1
 #define FAKE_TEST_FID1 (FAKE_TEST_INPUT1/N_INPUTS_PER_PACKET)
-        f1 = FAKE_TEST_FID1;
+        a1 = FAKE_TEST_FID1;
 #endif
-        for(m=0; m<Nm; m++) {
-          for(t=0; t<Nt; t++) {
-            data[paper_input_databuf_data_idx(m,f,t,c)] =
-              ((uint64_t)0xf0) << (8*(7-(FAKE_TEST_INPUT%N_INPUTS_PER_PACKET)));
+        //for(m=0; m<Nm; m++) {
+        //  for(t=0; t<Nt; t++) {
+            //data[paper_input_databuf_data_idx(m,a,c,t)] =
+            //  ((uint64_t)0xf0) << (8*(7-(FAKE_TEST_INPUT%N_INPUTS_PER_PACKET)));
 #ifdef FAKE_TEST_INPUT1
-            data[paper_input_databuf_data_idx(m,f1,t,c)] =
+            data[paper_input_databuf_data_idx(m,a1,c,t)] =
               ((uint64_t)0xf0) << (8*(7-(FAKE_TEST_INPUT1%N_INPUTS_PER_PACKET)));
 #endif
-          }
-        }
+        //  }
+        //}
 
         // Mark block as full
         paper_input_databuf_set_filled(db, block_idx);

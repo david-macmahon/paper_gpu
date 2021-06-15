@@ -1,0 +1,9 @@
+[submodule "xGPU"]
+	path = xGPU
+	url = https://github.com/GPU-correlators/xGPU
+[submodule "bitshuffle"]
+	path = bitshuffle
+	url = https://github.com/kiyo-masui/bitshuffle
+[submodule "hashpipe"]
+	path = hashpipe
+	url = https://github.com/hera-team/hashpipe.git

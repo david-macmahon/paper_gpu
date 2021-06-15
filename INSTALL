@@ -27,4 +27,11 @@ Example:
 If xGPU is installed under "/usr/local/xgpu16_256_32_titan", you can tell
 configure to find it there like this:
 
-$ ./configure --with-xgpu=/usr/local/xgpu16_256_32_titan
+$ ./configure --with-xgpu=/usr/local/xgpu-1080-dp4a
+
+If you need to build xGPU, it is included as a git submodule in this repository.
+Go into the xGPU/src directory and run (eg, for HERA H2C):
+make clean
+make NSTATION=192 NFREQUENCY=384 NTIME=2048 NTIME_PIPE=1024 CUDA_ARCH=sm_61 DP4A=yes
+sudo make install prefix=/usr/local/xgpu-1080-dp4a
+

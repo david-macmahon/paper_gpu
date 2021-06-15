@@ -47,16 +47,19 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
     hashpipe_status_lock_safe(&st);
     hputs(st.buf,  "INTSTAT", "off");
     hputi8(st.buf, "INTSYNC", 0);
-    hputi4(st.buf, "INTCOUNT", N_SUB_BLOCKS_PER_INPUT_BLOCK);
+    hputi4(st.buf, "INTCOUNT", 1);
     hputi8(st.buf, "GPUDUMPS", 0);
     hgeti4(st.buf, "GPUDEV", &gpu_dev); // No change if not found
     hputi4(st.buf, "GPUDEV", gpu_dev);
+    hputi8(st.buf, "GPUNANT", N_ANTS);
+    hputi8(st.buf, "GPUNCHAN", N_CHAN_PER_X);
+    hputi8(st.buf, "GPUNTIME", N_TIME_PER_BLOCK);
     hashpipe_status_unlock_safe(&st);
 
     /* Loop */
     int rv;
     char integ_status[17];
-    uint64_t start_mcount, last_mcount=0;
+    uint64_t start_mcount, last_mcount=0, middle_mcount;
     uint64_t gpu_dumps=0;
     int int_count; // Number of blocks to integrate per dump
     int xgpu_error = 0;
@@ -91,7 +94,7 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
         hashpipe_status_lock_safe(&st);
         hputs(st.buf, status_key, "waiting");
         hgets(st.buf,  "INTSTAT", 16, integ_status);
-        hgeti8(st.buf, "INTSYNC", (long long*)&start_mcount);
+        hgeti8(st.buf, "INTSYNC", (long int *)&start_mcount);
         hashpipe_status_unlock_safe(&st);
 
         // Wait for new input block to be filled
@@ -137,14 +140,16 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
             } else if(db_in->block[curblock_in].header.mcnt == start_mcount) {
               // Set integration status to "on"
               // Read integration count (INTCOUNT)
-              fprintf(stderr, "--- integration on ---\n");
+              fprintf(stdout, "--- integration on ---\n");
               strcpy(integ_status, "on");
               hashpipe_status_lock_safe(&st);
               hputs(st.buf,  "INTSTAT", integ_status);
               hgeti4(st.buf, "INTCOUNT", &int_count);
               hashpipe_status_unlock_safe(&st);
               // Compute last mcount
-              last_mcount = start_mcount + (int_count-1) * N_SUB_BLOCKS_PER_INPUT_BLOCK;
+              last_mcount = start_mcount + TIME_DEMUX*(int_count-N_TIME_PER_BLOCK);// * N_SUB_BLOCKS_PER_INPUT_BLOCK;
+              middle_mcount = (last_mcount + start_mcount + TIME_DEMUX*N_TIME_PER_BLOCK) >> 1;
+              fprintf(stdout, "Accumulating %d spectra to mcount: %lu\n", int_count, last_mcount);
             // Else (missed starting mcount)
             } else {
               // Handle missed start of integration
@@ -213,9 +218,8 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
           clock_gettime(CLOCK_MONOTONIC, &stop);
           elapsed_gpu_ns += ELAPSED_NS(start, stop);
 
-          // TODO Maybe need to subtract all or half the integration time here
-          // depending on recevier's expectations.
-          db_out->block[curblock_out].header.mcnt = last_mcount;
+          // Use the middle_mcount, which marks the center of the integration
+          db_out->block[curblock_out].header.mcnt = middle_mcount;
           // If integration status if "stop"
           if(!strcmp(integ_status, "stop")) {
             // Set integration status to "off"
@@ -225,7 +229,8 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
             hashpipe_status_unlock_safe(&st);
           } else {
             // Advance last_mcount for end of next integration
-            last_mcount += int_count * N_SUB_BLOCKS_PER_INPUT_BLOCK;
+            last_mcount += TIME_DEMUX*int_count;// * N_SUB_BLOCKS_PER_INPUT_BLOCK;
+            middle_mcount += TIME_DEMUX*int_count;
           }
 
           // Mark output block as full and advance
@@ -237,7 +242,7 @@ static void *run(hashpipe_thread_args_t * args, int doCPU)
           gpu_dumps++;
           hashpipe_status_lock_safe(&st);
           hputi8(st.buf, "GPUDUMPS", gpu_dumps);
-          hputr4(st.buf, "GPUGBPS", (float)(8*N_FLUFFED_BYTES_PER_BLOCK*gpu_block_count)/elapsed_gpu_ns);
+          hputr4(st.buf, "GPUGBPS", (float)(8L*N_FLUFFED_BYTES_PER_BLOCK*gpu_block_count)/elapsed_gpu_ns);
           hashpipe_status_unlock_safe(&st);
 
           // Start new average

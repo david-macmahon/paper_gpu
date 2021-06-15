@@ -1,7 +1,8 @@
-// paper_gpu_output_thread.c
+// hera_gpu_output_thread.c
 //
 // Sends integrated GPU output to "catcher" machine for assimilation into a
-// dataset.
+// dataset. Unlike the original PAPER output thread, this code integrates
+// over XENG_CHAN_SUM channels, and performs a channel x baseline transpose
 
 #include <stdio.h>
 #include <string.h>
@@ -19,187 +20,71 @@
 #include "hashpipe.h"
 #include "paper_databuf.h"
 
-// The PAPER cn_rx.py script receives UDP packets from multiple X engines and
-// assimilates them into a MIRIAD dataset.  The format of the packets appears
-// to be an early version of SPEAD, but they are clearly *not* compatible with
-// SPEAD verison 4.  The format of the packets, based on a reverse engineering
-// of both the transmit and receive side of the existing code, is documented
-// here.
-//
-// The packets consist of a header, some number of option values, and payload:
-//
-//   header
-//   option_1
-//   ...
-//   option_N
-//   payload
-//
-// ...where header and option_X are 64 bit values and payload is a sequence of
-// 32 bit integers containing the integration buffer's contents.
-//
-// header consists of the following four 16 bit values...
-//
-//   pkt_type pkt_version 0x0000 N
-//
-// ...where pkt_type is 0x4b52, pkt_version is 0x0003, and N is the number of
-// option values that follow (pkt_version is a guess at that field;s purpose).
-// option_1 through option_N are each 64 bit values in the form...
-//
-//   optid optval
-//
-// ...where optid is a 16 bit value and optval is a 48 bit value.
-//
-// The receive code that unpacks the data is agnostic about the exact number
-// and order of options, but the processing of the unpacked data requires the
-// following options to be present...
-//
-//   INSTIDS == 0x00320003NNNNEEEE, where 0032 is 16 bit optid (decimal 50)
-//                                        0003 is 16 bit instrument_id,
-//                                        NNNN is 16 bit instance_id,
-//                                    and EEEE is 16 bit engine_id.
-//
-//   TIMESTAMP == 0x0003TTTTTTTTTTTT, where 0003 is 16 bit optid (decimal 3),
-//                                      and TTTTTTTTTTTT is 48 bit timestamp
-//                                          (e.g. mcount).
-//
-//   HEAPOFF == 0x0005HHHHHHHHHHHH, where 0005 is 16 bit optid (decimal 5),
-//                                    and HHHHHHHHHHHH is 48 bit heap offset.
-//
-//   PKTINFO == 0x0033LLLLLLCCCCCC, where 0033 is 16 bit optid (decimal 51),
-//                                        LLLLLL is 24 bit length,
-//                                    and CCCCCC is 24 bit count.
-//
-// Also recognized, but apparently unused, by the receiver, are...
-//
-//   CURRERR == 0x0034EEEEEEEEEEEE, where 0034 is 16 bit optid (decimal 52),
-//                                    and EEEEEEEEEEEE is 48 bit error code.
-//
-//   HEAPPTR == 0x0035PPPPPPPPPPPP, where 0035 is 16 bit optid (decimal 53),
-//                                    and PPPPPPPPPPPP is 48 bit heap pointer.
-//
-// Sent by corr_tx.py, but ignored by the receiver are...
-//
-//   HEAPLEN == 0x0004LLLLLLLLLLLL, where 0004 is the 16 bit optid (decimal 4),
-//                                    and LLLLLLLLLLLL is 48 bit heap length.
-//
-// Notes for the various optval fields (some of the info below is speculative
-// at the time of writing):
-//
-//   INSTIDS.instrument_id must be 0x0004, which tels the receive code that the
-//   payload data are 32 bit little endian floats in contiguous channel order.
-//
-//   INSTIDS.instance_id is always sent as 0x0000.
-//
-//   TIMESTAMP.timestamp is scaled mcount used for collating packets from all X
-//   engines.  Not clear whether it is mcount at begining, middle, or end of
-//   integration.  The scaling factor is required to mimic the mcount values
-//   output by the FPGA X engines.  This allows the same catcher software to
-//   work with either FPGA or GPU X engines (or both).  The cacther software
-//   expects the mcount to be a  sample count divided by 128.  In other words,
-//   mcount * 128 = number of 200 Msps samples since the last sync-up with 1
-//   PPS.  The scaling factor is thus:
-//
-//      timestamp = mcount * N_TIME_PER_PACKET * 2 * N_CHAN_TOTAL / 128
-//
-//   HEAPOFF.heap_offset is the offset within the integration buffer from which
-//   the packet's payload originated (each integration buffer requires multiple
-//   packets).  Note that the data order within the overall integration buffer
-//   is pre-defined based on the readout order of the FPGA X engine's
-//   integration buffer.
-//
-//   PKTINFO.legnth is the length in bytes of the packet payload.  Maximum
-//   allowed value is theoretically 8192, but recevier imposes a limit of 4096.
-//
-//   PKTINFO.count is sent as 0x0000 and is unused by the receiver.
-//
-//   The corr_tx.py script sends the unused HEAPPTR option with the most
-//   significant bit of optid set (i.e. optid 0x8035 rather than 0x0035) and
-//   always sends HEAPPTR.heap_pointer as 0.  Since this optid is not
-//   recognized by the receiver, this option is ignored completely by the
-//   receiver (as opposed to being recognized but unused).
-//
-//   The corr_tx.py script always sends the ignored HEAPLEN.heap_length field
-//   as 139264.
-//
-//   The corr_tx.py script sends the options in this order:
-//
-//     INSTIDS
-//     PKTINFO
-//     TIMESTAMP
-//     HEAPLEN (ignored)
-//     HEAPOFF
-//     HEAPPTR (ignored)
+//   Correlator data are sent to a data catcher using a simple UDP packetization
+//   format:
+
+//   uint64_t TIMESTAMP (set to be the MCNT provided by the databuf delivered by the upstream processor)
+//   uint32_t OFFSET (offset in bytes where this packet should be placed in memory to build the complete output)
+//   uint16_t X-ENGINE ID
+//   uint16_t PAYLOAD LENGTH (length of data payload in this packet in bytes)
 
 // Structure for packet header
-//
-// Note that this only accounts for fields actually used by the receiver.
-// Fields sent by corr_tx.py but ignored or not used by the receiver are not
-// sent by this thread.
+
 typedef struct pkthdr {
-  uint64_t header;
-  uint64_t instids;
-  uint64_t pktinfo;
   uint64_t timestamp;
-  uint64_t offset;
-  uint64_t heaplen; // for padding to 128 byte header; ignored by receiver
+  uint32_t offset;
+  uint16_t xeng_id;
+  uint16_t payload_len;
 } pkthdr_t;
 
-// BYTES_PER_PACKET is limited by recevier code and must be multiple of 8
-#define BYTES_PER_PACKET 4096
+// Macros for generating values for the pkthdr_t fields
+#define TIMESTAMP(x) (htobe64((uint64_t)x))
+#define OFFSET(x)    (htobe32((uint32_t)x))
+#define XENG_ID(x)    (htobe16((uint16_t)x))
+#define PAYLOAD_LEN(x)    (htobe16((uint16_t)x))
 
-#ifdef SEND_BE32
+#define CONVERT(x) (htobe32(x))
+
 typedef int32_t pktdata_t;
-// TODO Handle Inf and NaNs?  They "should never happen", right?  :-)
-static inline pktdata_t convert(float f)
-{
-  if(f > INT32_MAX) {
-    return INT32_MAX;
-  } else if(f < INT32_MIN+1) {
-    // +1 to keep saturation symmetric
-    return INT32_MIN+1;
-  } else {
-    return (pktdata_t)lroundf(f);
-  }
-}
-#define CONVERT(x) (htobe32(convert(x)))
-#else
-typedef float pktdata_t;
-#define CONVERT(x) (x)
-#endif
 
+// Structure of a packet
 typedef struct pkt {
   pkthdr_t hdr;
-  pktdata_t data[BYTES_PER_PACKET/sizeof(pktdata_t)];
+  pktdata_t data[OUTPUT_BYTES_PER_PACKET/sizeof(pktdata_t)];
 } pkt_t;
-
-// Macros for generating values for the pkthdr_t fields
-#define HEADER (htobe64(0x4b52000300000005))
-#define INSTIDS(x)   (htobe64(0x0032000400000000 | ( (uint64_t)(x) &         0xffff       )))
-#define PKTINFO(x)   (htobe64(0x0033000000000000 | (((uint64_t)(x) &       0xffffff) << 24)))
-#define TIMESTAMP(x) (htobe64(0x0003000000000000 | ( (uint64_t)(x) & 0xffffffffffff       )))
-#define OFFSET(x)    (htobe64(0x0005000000000000 | ( (uint64_t)(x) & 0xffffffffffff       )))
-#define HEAPLEN      (htobe64(0x0004000000000000))
 
 static XGPUInfo xgpu_info;
 
 // PACKET_DELAY_NS is number of nanoseconds to delay between packets.  This is
-// to prevent overflowing the network interface's TX queue.  The delay is 4
-// times longer than necessary for a single packet so that up to 4 instances
-// can dump simulatneously without problems.  For larger correlators running
-// fewer instance per GPU host, this may be too long, but for now it shouldn't
-// be a problem.  Note that this accounts only for the packet's payload (i.e.
+// to prevent overflowing the network interface's TX queue.
+// Keep in mind the total throughput of the network, and also the number
+// of x-engine instances which will be running on each host.
+
+// Note that the below calculations account only for the packet's payload (i.e.
 // it considers the size of the packet header to be negligible).
 //
 // 1000 megabit per second =   1 nanosecond per bit
 //  100 megabit per second =  10 nanosecond per bit
 //   10 megabit per second = 100 nanosecond per bit
-//#define PACKET_DELAY_NS (4 * 10 * 8 * BYTES_PER_PACKET)
-// Really trickle it out...
-#define PACKET_DELAY_NS (100 * 8 * BYTES_PER_PACKET)
+
+// Set to 200 Mbps -- OK for two instances per node.
+// With 16 nodes, amounts to 6.4 Gbps of data
+
+// Original
+//#define PACKET_DELAY_NS (OUTPUT_BYTES_PER_PACKET>>2)
+
+// delivers packets for ~6 sec with 96 chan
+//#define PACKET_DELAY_NS (430 * 1000)
+
+// packets for ~6sec with 384 chan
+//#define PACKET_DELAY_NS (430 * 1000/4)
+
+// packet for ~7.5 sec with 384 chan
+#define PACKET_DELAY_NS (536 * 1000/4)
 
 // bytes_per_dump depends on xgpu_info.triLength
 static uint64_t bytes_per_dump = 0;
-// packets_per_dump is bytes_per_dump / BYTES_PER_PACKET
+// packets_per_dump is bytes_per_dump / OUTPUT_BYTES_PER_PACKET
 static unsigned int packets_per_dump = 0;
 
 // Open and connect a UDP socket to the given host and port.  Note that port is
@@ -396,7 +281,7 @@ static int init(struct hashpipe_thread_args *args)
     // Get sizing parameters
     xgpuInfo(&xgpu_info);
     bytes_per_dump = xgpu_info.triLength * sizeof(Complex);
-    packets_per_dump = bytes_per_dump / BYTES_PER_PACKET;
+    packets_per_dump = bytes_per_dump / OUTPUT_BYTES_PER_PACKET;
     printf("bytes_per_dump = %lu\n", bytes_per_dump);
 
     if(init_idx_map()) {
@@ -433,16 +318,11 @@ static void *run(hashpipe_thread_args_t * args)
     hashpipe_status_unlock_safe(&st);
 
     pkt_t pkt;
-    pkt.hdr.header = HEADER;
-    pkt.hdr.instids = INSTIDS(xengine_id);
-    pkt.hdr.pktinfo = PKTINFO(BYTES_PER_PACKET);
-    pkt.hdr.heaplen = HEAPLEN;
+    pkt.hdr.xeng_id = XENG_ID(xengine_id);
+    pkt.hdr.payload_len = PAYLOAD_LEN(OUTPUT_BYTES_PER_PACKET);
 
     // TODO Get catcher hostname and port from somewhere
 
-#ifndef CATCHER_PORT
-#define CATCHER_PORT 7148
-#endif
 #define stringify2(x) #x
 #define stringify(x) stringify2(x)
 
@@ -455,6 +335,7 @@ static void *run(hashpipe_thread_args_t * args)
 
 #ifdef TEST_INDEX_CALCS
     int i, j;
+    off_t o;
     for(i=0; i<32; i++) {
       for(j=i; j<32; j++) {
         regtile_index(2*i, 2*j);
@@ -462,19 +343,21 @@ static void *run(hashpipe_thread_args_t * args)
     }
     for(i=0; i<32; i++) {
       for(j=i; j<32; j++) {
-        casper_index(2*i, 2*j);
+        o = casper_index(2*i, 2*j, N_INPUTS);
+        fprintf(stdout, "%d, %d, %d\n", i, j, (int) o);
       }
     }
 #endif
 
     /* Main loop */
     int rv;
-    int casper_chan, gpu_chan;
-    int baseline;
+    int casper_chan, gpu_chan, sum_chan;
+    int baseline, pol;
     unsigned int dumps = 0;
     int block_idx = 0;
     struct timespec start, stop;
     struct timespec pkt_start, pkt_stop;
+    pktdata_t re, im;
     while (run_threads()) {
 
         hashpipe_status_lock_safe(&st);
@@ -504,68 +387,75 @@ static void *run(hashpipe_thread_args_t * args)
         hputi4(st.buf, "OUTBLKIN", block_idx);
         hashpipe_status_unlock_safe(&st);
 
-        // Update header's timestamp for this dump.  For historic/unknown
-        // reasons, the catcher expects timestamps to be in units of PFB
-        // samples (even though its source claims ADC samples!) divided by a
-        // mysterious constant value of 128 that is no doubt related to some
-        // FPGA based X engine from the past.
-        pkt.hdr.timestamp = TIMESTAMP(db->block[block_idx].header.mcnt *
-            N_TIME_PER_PACKET * N_CHAN_TOTAL / 128);
-
-        // Init header's offset for this dump
+        // Update header's timestamp for this dump.
+        pkt.hdr.timestamp = TIMESTAMP(db->block[block_idx].header.mcnt);
+        // Reset packet/byte counters to 0
+        pkt.hdr.offset = OFFSET(0);
         uint32_t nbytes = 0;
-        pkt.hdr.offset = OFFSET(nbytes);
 
         // Unpack and convert in packet sized chunks
-        float * pf_re  = db->block[block_idx].data;
-        float * pf_im  = db->block[block_idx].data + xgpu_info.matLength;
+        // output data in order: baseline x chan x stokes (slowest to fastest varying)
+        pktdata_t * pf_re  = db->block[block_idx].data;
+        pktdata_t * pf_im  = db->block[block_idx].data + xgpu_info.matLength;
         pktdata_t * p_out = pkt.data;
         clock_gettime(CLOCK_MONOTONIC, &pkt_start);
-        for(casper_chan=0; casper_chan<N_CHAN_PER_X; casper_chan++) {
-          // This used to de-interleave channels.  De-interleaving is no longer
-          // needed, but we choose to continue maintaining the distinction
-          // between casper_chan and gpu_chan.
-          gpu_chan = casper_chan;
-          for(baseline=0; baseline<N_CASPER_COMPLEX_PER_CHAN; baseline++) {
-            off_t idx_regtile = idx_map[baseline];
-            pktdata_t re = CONVERT(pf_re[gpu_chan*REGTILE_CHAN_LENGTH+idx_regtile]);
-            pktdata_t im = CONVERT(pf_im[gpu_chan*REGTILE_CHAN_LENGTH+idx_regtile]);
-            *p_out++ = re;
-            *p_out++ = -im; // Conjugate data to match downstream expectations
-            nbytes += 2*sizeof(pktdata_t);
-            if(nbytes % BYTES_PER_PACKET == 0) {
-              int bytes_sent = send(sockfd, &pkt, sizeof(pkt.hdr)+BYTES_PER_PACKET, 0);
-              if(bytes_sent == -1) {
-                // Send all packets even if cactcher is not listening (i.e. we
-                // we get a connection refused error), but abort sending this
-                // dump if we get any other error.
-                if(errno != ECONNREFUSED) {
-                  perror("send");
-                  // Update stats
-                  hashpipe_status_lock_safe(&st);
-                  hputu4(st.buf, "OUTDUMPS", ++dumps);
-                  hputr4(st.buf, "OUTSECS", 0.0);
-                  hputr4(st.buf, "OUTMBPS", 0.0);
-                  hashpipe_status_unlock_safe(&st);
-                  // Break out of both for loops
-                  goto done_sending;
+        // Iterate over blocks of N_STOKES baselines. All stokes are sent in adjacent words
+        for(baseline=0; baseline<N_CASPER_COMPLEX_PER_CHAN; baseline+=N_STOKES) {
+          // Iterate over blocks of XENG_CHAN_SUM channels. An inner loop will sum these
+          for(casper_chan=0; casper_chan<N_CHAN_PER_X; casper_chan=casper_chan+XENG_CHAN_SUM) {
+            for(pol=0; pol<N_STOKES; pol++) {
+              // This used to de-interleave channels.  De-interleaving is no longer
+              // needed, but we choose to continue maintaining the distinction
+              // between casper_chan and gpu_chan.
+              gpu_chan = casper_chan;
+              off_t idx_regtile = idx_map[baseline + pol];
+              for(sum_chan=0; sum_chan<XENG_CHAN_SUM; sum_chan++) {
+                if (sum_chan == 0) {
+                  re = pf_re[gpu_chan*REGTILE_CHAN_LENGTH+idx_regtile];
+                  im = pf_im[gpu_chan*REGTILE_CHAN_LENGTH+idx_regtile];
+                } else {
+                  re += pf_re[(gpu_chan+sum_chan)*REGTILE_CHAN_LENGTH+idx_regtile];
+                  im += pf_im[(gpu_chan+sum_chan)*REGTILE_CHAN_LENGTH+idx_regtile];
                 }
-              } else if(bytes_sent != sizeof(pkt.hdr)+BYTES_PER_PACKET) {
-                printf("only sent %d of %lu bytes!!!\n", bytes_sent, sizeof(pkt.hdr)+BYTES_PER_PACKET);
               }
+              *p_out++ = CONVERT(re);
+              *p_out++ = CONVERT(-im); // Conjugate to match downstream expectations.
+              nbytes += 2*sizeof(pktdata_t);
+              if(nbytes % OUTPUT_BYTES_PER_PACKET == 0) {
+                int bytes_sent = send(sockfd, &pkt, sizeof(pkt.hdr)+OUTPUT_BYTES_PER_PACKET, 0);
+                if(bytes_sent == -1) {
+                  // Send all packets even if cactcher is not listening (i.e. we
+                  // we get a connection refused error), but abort sending this
+                  // dump if we get any other error.
+                  if(errno != ECONNREFUSED) {
+                    perror("send");
+                    // Update stats
+                    hashpipe_status_lock_safe(&st);
+                    hgetu4(st.buf, "OUTDUMPS", &dumps);
+                    hputu4(st.buf, "OUTDUMPS", ++dumps);
+                    hputr4(st.buf, "OUTSECS", 0.0);
+                    hputr4(st.buf, "OUTMBPS", 0.0);
+                    hashpipe_status_unlock_safe(&st);
+                    // Break out of both for loops
+                    goto done_sending;
+                  }
+                } else if(bytes_sent != sizeof(pkt.hdr)+OUTPUT_BYTES_PER_PACKET) {
+                  printf("only sent %d of %lu bytes!!!\n", bytes_sent, sizeof(pkt.hdr)+OUTPUT_BYTES_PER_PACKET);
+                }
 
-              // Delay to prevent overflowing network TX queue
-              clock_gettime(CLOCK_MONOTONIC, &pkt_stop);
-              packet_delay.tv_nsec = PACKET_DELAY_NS - ELAPSED_NS(pkt_start, pkt_stop);
-              if(packet_delay.tv_nsec > 0 && packet_delay.tv_nsec < 1000*1000*1000) {
-                nanosleep(&packet_delay, NULL);
+                // Delay to prevent overflowing network TX queue
+                clock_gettime(CLOCK_MONOTONIC, &pkt_stop);
+                packet_delay.tv_nsec = PACKET_DELAY_NS - ELAPSED_NS(pkt_start, pkt_stop);
+                if(packet_delay.tv_nsec > 0 && packet_delay.tv_nsec < 1000*1000*1000) {
+                  nanosleep(&packet_delay, NULL);
+                }
+
+                // Setup for next packet
+                p_out = pkt.data;
+                pkt_start = pkt_stop;
+                // Update header's byte_offset for this chunk
+                pkt.hdr.offset = OFFSET(nbytes);
               }
-
-              // Setup for next packet
-              p_out = pkt.data;
-              pkt_start = pkt_stop;
-              // Update header's byte_offset for this chunk
-              pkt.hdr.offset = OFFSET(nbytes);
             }
           }
         }
@@ -573,9 +463,11 @@ static void *run(hashpipe_thread_args_t * args)
         clock_gettime(CLOCK_MONOTONIC, &stop);
 
         hashpipe_status_lock_safe(&st);
+        hgetu4(st.buf, "OUTDUMPS", &dumps);
         hputu4(st.buf, "OUTDUMPS", ++dumps);
+        hputu4(st.buf, "OUTBYTES", nbytes);
         hputr4(st.buf, "OUTSECS", (float)ELAPSED_NS(start,stop)/1e9);
-        hputr4(st.buf, "OUTMBPS", (1e3*8*bytes_per_dump)/ELAPSED_NS(start,stop));
+        hputr4(st.buf, "OUTMBPS", (1e3*8*nbytes)/ELAPSED_NS(start,stop));
         hashpipe_status_unlock_safe(&st);
 
 done_sending:
@@ -595,7 +487,7 @@ done_sending:
 }
 
 static hashpipe_thread_desc_t gpu_output_thread = {
-    name: "paper_gpu_output_thread",
+    name: "hera_gpu_output_thread",
     skey: "OUTSTAT",
     init: init,
     run:  run,

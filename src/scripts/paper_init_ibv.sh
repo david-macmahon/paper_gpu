@@ -15,9 +15,9 @@ myip=$(getip $(hostname))
 # If a pxN match is found, mypx gets set to N (i.e. just the numeric part).
 # If no match is found, mypx will be empty.
 mypx=
-for p in {1..8}
+for p in {1..16}
 do
-  ip=$(getip px${p}.paper.pvt)
+  ip=$(getip px${p})
   [ "${myip}" == "${ip}" ] || continue
   mypx=$p
 done
@@ -113,6 +113,30 @@ case ${hostname} in
       "0x0606 ${hostname}-2.tenge.pvt  0  $xid0  2   4   3   4" # Instance 0, eth2
     );;
 
+  px*)
+    # Setup parameters for two instances.
+    # 2 x E5-2620 v4 (disabled-HyperThreading,  8-cores @ 2.1 GHz, 20 MB L3, 8 GT/s QPI, 2667 MHz DRAM)
+    # Fluff thread and output thread share a core.
+    # Save core  0 for OS.
+    # Save core  1 for eth2
+    # Save core 8 for symmetry with core 0
+    # Save core 9 for eth4 and eth5
+    #
+    # Setup for two GPU devices (two TITANs).
+    #
+    #                               GPU       NET FLF GPU OUT
+    # mask  bind_host               DEV  XID  CPU CPU CPU CPU
+    # Calculate XIDs based on mypx
+    xid0=$(( 2*(mypx-1)    ))
+    xid1=$(( 2*(mypx-1) + 1))
+
+    instances=( 
+      #                               GPU       NET FLF GPU OUT
+      # mask  bind_host               DEV  XID  CPU CPU CPU CPU
+      "0x00ff eth3                     0  $xid0  0   0x0006   3   4" # Instance 0, eth3
+      "0xff00 eth5                     1  $xid1  8   0x0600  11  12" # Instance 1, eth5
+    );;
+
   *)
     echo "This host (${hostname}) is not supported by $(basename $0)"
     exit 1
@@ -147,20 +171,20 @@ function init() {
     -o BINDHOST=$bindhost \
     -o GPUDEV=$gpudev \
     -o XID=$xid \
-    -c $netcpu paper_net_thread \
-    -c $flfcpu paper_fluff_thread \
+    -c $netcpu hera_ibv_thread \
+    -m $flfcpu paper_fluff_thread \
     -c $gpucpu paper_gpu_thread \
-    -c $outcpu paper_gpu_output_thread
+    -c $outcpu hera_gpu_output_thread
 
   taskset $mask \
   hashpipe -p paper_gpu -I $instance \
     -o BINDHOST=$bindhost \
     -o GPUDEV=$gpudev \
     -o XID=$xid \
-    -c $netcpu paper_net_thread \
-    -c $flfcpu paper_fluff_thread \
+    -c $netcpu hera_ibv_thread \
+    -m $flfcpu paper_fluff_thread \
     -c $gpucpu paper_gpu_thread \
-    -c $outcpu paper_gpu_output_thread \
+    -c $outcpu hera_gpu_output_thread \
      < /dev/null \
     1> px${mypx}.out.$instance \
     2> px${mypx}.err.$instance &
